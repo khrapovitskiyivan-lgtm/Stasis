@@ -124,8 +124,9 @@ git commit -m "chore: monorepo scaffold with pnpm workspaces"
   - `ELEMENTS = ['fire','water','air','earth'] as const`
   - `WheelScoresSchema` → `Record<Area, 1..10>`
   - `LikertAnswerSchema` → `{ itemId: string; value: 1..6 }`
-  - `SubmitPayloadSchema` → `{ wheel: WheelScores; elementAnswers: LikertAnswer[]; resourceAnswers: LikertAnswer[] }`
-  - Types: `Area`, `Element`, `WheelScores`, `LikertAnswer`, `SubmitPayload`.
+  - `STRATEGIES = ['power','attention','superiority','avoidance'] as const`
+  - `SubmitPayloadSchema` → `{ wheel: WheelScores; elementAnswers: LikertAnswer[]; strategyAnswers: LikertAnswer[]; resourceAnswers: LikertAnswer[] }`
+  - Types: `Area`, `Element`, `Strategy`, `WheelScores`, `LikertAnswer`, `SubmitPayload`.
 
 - [ ] **Step 1: Create `packages/shared/package.json`**
 
@@ -173,6 +174,7 @@ describe('SubmitPayloadSchema', () => {
     const p = {
       wheel: { health: 3, family: 7, rest: 5, friends: 4, career: 3, hobby: 6 },
       elementAnswers: [{ itemId: 'e1', value: 6 }],
+      strategyAnswers: [{ itemId: 's1', value: 4 }],
       resourceAnswers: [{ itemId: 'r1', value: 2 }],
     };
     expect(SubmitPayloadSchema.parse(p)).toEqual(p);
@@ -181,6 +183,7 @@ describe('SubmitPayloadSchema', () => {
     expect(() => SubmitPayloadSchema.parse({
       wheel: { health: 3, family: 7, rest: 5, friends: 4, career: 3, hobby: 6 },
       elementAnswers: [{ itemId: 'e1', value: 7 }],
+      strategyAnswers: [],
       resourceAnswers: [],
     })).toThrow();
   });
@@ -199,8 +202,10 @@ import { z } from 'zod';
 
 export const AREAS = ['health', 'family', 'rest', 'friends', 'career', 'hobby'] as const;
 export const ELEMENTS = ['fire', 'water', 'air', 'earth'] as const;
+export const STRATEGIES = ['power', 'attention', 'superiority', 'avoidance'] as const;
 export type Area = (typeof AREAS)[number];
 export type Element = (typeof ELEMENTS)[number];
+export type Strategy = (typeof STRATEGIES)[number];
 
 const score1to10 = z.number().int().min(1).max(10);
 export const WheelScoresSchema = z.object(
@@ -217,6 +222,7 @@ export type LikertAnswer = z.infer<typeof LikertAnswerSchema>;
 export const SubmitPayloadSchema = z.object({
   wheel: WheelScoresSchema,
   elementAnswers: z.array(LikertAnswerSchema),
+  strategyAnswers: z.array(LikertAnswerSchema),
   resourceAnswers: z.array(LikertAnswerSchema),
 });
 export type SubmitPayload = z.infer<typeof SubmitPayloadSchema>;
