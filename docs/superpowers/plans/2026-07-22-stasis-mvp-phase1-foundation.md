@@ -12,12 +12,12 @@
 
 - Node.js ≥ 20 LTS; TypeScript `strict: true`; ESM modules (`"type": "module"`).
 - Package manager: **pnpm** (workspaces). No npm/yarn lockfiles.
-- SQLite via `better-sqlite3` with `PRAGMA journal_mode=WAL` and `PRAGMA busy_timeout=5000`.
+- SQLite via Node's built-in `node:sqlite` (`DatabaseSync`) with `PRAGMA journal_mode=WAL` and `PRAGMA busy_timeout=5000`. No native build / node-gyp / Visual Studio required.
 - All request/response bodies validated by zod schemas from `packages/shared` — never trust client-computed values (profile, scores are recomputed server-side in Phase 2).
 - `initData` validated on every protected request; `auth_date` older than **3 hours** is rejected.
 - Secrets only from environment (`BOT_TOKEN`, `JWT_SECRET`); never committed. `.env` is git-ignored.
 - Sensitive raw data (test answers, wheel scores) is encrypted at rest in later phases; Phase 1 stores only `users` (no sensitive psychological data yet).
-- Windows note: `better-sqlite3` is a native module — `pnpm install` must succeed with build tools present (VS Build Tools / `windows-build-tools`). If native build fails, that is an environment fix, not a code change.
+- `node:sqlite` is built into Node ≥22.5 (present on Node 24) — no external SQLite dependency, no compilation. Stable in Node 24 (no runtime flag, no experimental warning). This replaces `better-sqlite3`, whose native build fails on this machine's toolchain.
 - Tests: **vitest**. Every task ends green before commit.
 
 ---
@@ -261,7 +261,7 @@ git commit -m "feat(shared): wheel and likert zod schemas as client-server contr
 **Interfaces:**
 - Consumes: nothing from other tasks.
 - Produces:
-  - `openDb(path: string): Database` — better-sqlite3 handle with WAL + busy_timeout, migrations applied.
+  - `openDb(path: string): Db` — `node:sqlite` `DatabaseSync` handle with WAL + busy_timeout, migrations applied.
   - `usersRepo(db)` → `{ upsertByTgId(tgUserId: number, username?: string, lang?: string): { id: number; tgUserId: number }; getByTgId(tgUserId: number): UserRow | undefined }`.
   - `UserRow = { id: number; tgUserId: number; username: string | null; lang: string | null; createdAt: number; deletedAt: number | null }`.
 
@@ -280,7 +280,6 @@ git commit -m "feat(shared): wheel and likert zod schemas as client-server contr
   },
   "dependencies": {
     "@stasis/shared": "workspace:*",
-    "better-sqlite3": "^11.0.0",
     "fastify": "^4.28.0",
     "jsonwebtoken": "^9.0.2",
     "@telegram-apps/init-data-node": "^1.1.0",
@@ -290,9 +289,8 @@ git commit -m "feat(shared): wheel and likert zod schemas as client-server contr
     "typescript": "^5.5.0",
     "vitest": "^2.0.0",
     "tsx": "^4.16.0",
-    "@types/better-sqlite3": "^7.6.0",
     "@types/jsonwebtoken": "^9.0.0",
-    "@types/node": "^20.14.0"
+    "@types/node": "^24.0.0"
   }
 }
 ```
@@ -337,20 +335,22 @@ Expected: FAIL — cannot resolve `./connection.js`.
 - [ ] **Step 5: Implement `apps/server/src/db/connection.ts`**
 
 ```ts
-import Database from 'better-sqlite3';
+import { DatabaseSync } from 'node:sqlite';
 import { runMigrations } from './migrate.js';
 
-export type Db = Database.Database;
+export type Db = DatabaseSync;
 
 export function openDb(path: string): Db {
-  const db = new Database(path);
-  db.pragma('journal_mode = WAL');
-  db.pragma('busy_timeout = 5000');
-  db.pragma('foreign_keys = ON');
+  const db = new DatabaseSync(path);
+  db.exec('PRAGMA journal_mode = WAL');
+  db.exec('PRAGMA busy_timeout = 5000');
+  db.exec('PRAGMA foreign_keys = ON');
   runMigrations(db);
   return db;
 }
 ```
+
+Note: `migrate.ts` and `users.repo.ts` below are unchanged by this switch — they use `db.exec(...)` and `db.prepare(...).run/get(...)`, which `DatabaseSync` supports with the same shapes (`run` → `{ changes, lastInsertRowid }`, `get` → row object | undefined).
 
 - [ ] **Step 6: Implement `apps/server/src/db/migrate.ts`**
 

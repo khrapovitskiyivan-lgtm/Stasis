@@ -141,7 +141,7 @@ computeProfile(elementAnswers, strategyAnswers, wheelScores, resourceAnswers, co
 
 ## 7. Архитектура
 
-- **Стек:** React + TypeScript + Vite (Mini App); Node + TypeScript, Fastify + grammY (бот+бэкенд, один процесс, webhook); SQLite (`better-sqlite3`, WAL, `busy_timeout`).
+- **Стек:** React + TypeScript + Vite (Mini App); Node + TypeScript, Fastify + grammY (бот+бэкенд, один процесс, webhook); SQLite через встроенный `node:sqlite` (`DatabaseSync`, WAL, `busy_timeout`) — без нативной сборки; репозиторный слой изолирует драйвер (задел на Postgres).
 - **Модель доверия:** клиент шлёт только сырьё (ответы, баллы колеса) + `initData`. Весь расчёт профиля и подбор карточек — на сервере. Тексты матрицы и логика — только на сервере (IP).
 - **Монорепо** (pnpm workspaces):
   ```
