@@ -14,6 +14,16 @@ describe('usersRepo', () => {
     expect(row?.username).toBe('ivan_new'); // username refreshed
   });
 
+  it('preserves stored username/lang when re-upserted without them', () => {
+    const db = openDb(':memory:');
+    const repo = usersRepo(db);
+    repo.upsertByTgId(4242, 'ivan', 'ru');
+    repo.upsertByTgId(4242); // e.g. a "touch" with no profile fields
+    const row = repo.getByTgId(4242);
+    expect(row?.username).toBe('ivan'); // not clobbered to NULL
+    expect(row?.lang).toBe('ru');
+  });
+
   it('returns undefined for unknown user', () => {
     const db = openDb(':memory:');
     expect(usersRepo(db).getByTgId(999)).toBeUndefined();

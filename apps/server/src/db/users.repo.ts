@@ -12,7 +12,9 @@ export interface UserRow {
 export function usersRepo(db: Db) {
   const insert = db.prepare(
     `INSERT INTO users (tg_user_id, username, lang, created_at) VALUES (?, ?, ?, ?)
-     ON CONFLICT(tg_user_id) DO UPDATE SET username = excluded.username, lang = excluded.lang`
+     ON CONFLICT(tg_user_id) DO UPDATE SET
+       username = COALESCE(excluded.username, users.username),
+       lang = COALESCE(excluded.lang, users.lang)`
   );
   const select = db.prepare(`SELECT * FROM users WHERE tg_user_id = ?`);
   const map = (r: any): UserRow | undefined =>
