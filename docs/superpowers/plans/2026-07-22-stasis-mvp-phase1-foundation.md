@@ -335,10 +335,18 @@ Expected: FAIL — cannot resolve `./connection.js`.
 - [ ] **Step 5: Implement `apps/server/src/db/connection.ts`**
 
 ```ts
-import { DatabaseSync } from 'node:sqlite';
+import { createRequire } from 'node:module';
 import { runMigrations } from './migrate.js';
 
-export type Db = DatabaseSync;
+// node:sqlite is a builtin only under its prefixed name. Vitest's Vite
+// pipeline strips the "node:" prefix and then fails to resolve bare
+// "sqlite". Loading it via createRequire at runtime bypasses Vite's static
+// resolution entirely (Vite only sees "node:module", a classic builtin it
+// handles). In plain Node this is just a normal builtin require.
+const nodeRequire = createRequire(import.meta.url);
+const { DatabaseSync } = nodeRequire('node:sqlite') as typeof import('node:sqlite');
+
+export type Db = InstanceType<typeof DatabaseSync>;
 
 export function openDb(path: string): Db {
   const db = new DatabaseSync(path);
@@ -350,7 +358,9 @@ export function openDb(path: string): Db {
 }
 ```
 
-Note: `migrate.ts` and `users.repo.ts` below are unchanged by this switch — they use `db.exec(...)` and `db.prepare(...).run/get(...)`, which `DatabaseSync` supports with the same shapes (`run` → `{ changes, lastInsertRowid }`, `get` → row object | undefined).
+Notes:
+- **Do NOT `import { DatabaseSync } from 'node:sqlite'` directly** — that static import breaks under Vitest/Vite (Vite strips `node:` and cannot resolve bare `sqlite`, since `sqlite` is a builtin only under its prefixed name). The `createRequire` form above is required and needs no vitest config.
+- `migrate.ts` and `users.repo.ts` below are unchanged — they use `db.exec(...)` and `db.prepare(...).run/get(...)`, which `DatabaseSync` supports with the same shapes (`run` → `{ changes, lastInsertRowid }`, `get` → row object | undefined). Type imports of `Db` resolve to `InstanceType<typeof DatabaseSync>`.
 
 - [ ] **Step 6: Implement `apps/server/src/db/migrate.ts`**
 
