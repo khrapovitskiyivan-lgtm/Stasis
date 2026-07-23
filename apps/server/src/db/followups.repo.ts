@@ -13,13 +13,17 @@ export interface FollowUpRow {
 
 export function followUpsRepo(db: Db, encKey: string) {
   const insert = db.prepare(
-    `INSERT INTO follow_ups (user_id, card_ref, step_text, due_at, created_at) VALUES (?, ?, ?, ?, ?)`
+    `INSERT INTO follow_ups (user_id, card_ref, step_text, due_at, unsubscribed, created_at) VALUES (?, ?, ?, ?, ?, ?)`
   );
   // Only rows that are due, unsent, and not from an unsubscribed user.
   const selectDue = db.prepare(
     `SELECT * FROM follow_ups WHERE due_at <= ? AND sent_at IS NULL AND unsubscribed = 0`
   );
   const markSentStmt = db.prepare(`UPDATE follow_ups SET sent_at = ? WHERE id = ?`);
+  // Opt-out persists on the user (survives future schedules), and existing
+  // pending rows are flipped so already-scheduled nudges don't fire either.
+  const optedOutStmt = db.prepare(`SELECT followups_opt_out FROM users WHERE id = ?`);
+  const setOptOutStmt = db.prepare(`UPDATE users SET followups_opt_out = 1 WHERE id = ?`);
   const unsubscribeStmt = db.prepare(
     `UPDATE follow_ups SET unsubscribed = 1 WHERE user_id = ? AND sent_at IS NULL`
   );
@@ -37,7 +41,9 @@ export function followUpsRepo(db: Db, encKey: string) {
 
   return {
     schedule(userId: number, cardRef: string, stepText: string, dueAt: number): { id: number } {
-      const res = insert.run(userId, cardRef, encryptField(stepText, encKey), dueAt, Date.now());
+      // Respect a persisted opt-out: schedule the row already unsubscribed so due() never picks it.
+      const optedOut = (optedOutStmt.get(userId) as { followups_opt_out?: number } | undefined)?.followups_opt_out === 1;
+      const res = insert.run(userId, cardRef, encryptField(stepText, encKey), dueAt, optedOut ? 1 : 0, Date.now());
       return { id: Number(res.lastInsertRowid) };
     },
     due(now: number): FollowUpRow[] {
@@ -47,7 +53,8 @@ export function followUpsRepo(db: Db, encKey: string) {
       markSentStmt.run(Date.now(), id);
     },
     unsubscribe(userId: number): void {
-      unsubscribeStmt.run(userId);
+      setOptOutStmt.run(userId); // persist opt-out so future schedules stay silent
+      unsubscribeStmt.run(userId); // and cancel any already-pending nudges
     },
     recordReply(id: number, reply: string): void {
       recordReplyStmt.run(reply, id);

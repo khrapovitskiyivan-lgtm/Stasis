@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { openDb } from '../db/connection.js';
 import { usersRepo } from '../db/users.repo.js';
+import { followUpsRepo } from '../db/followups.repo.js';
 import { buildBot } from './bot.js';
 
 const BOT_TOKEN = '123456:TESTTOKEN';
 const MINIAPP_URL = 'https://miniapp.example.com/';
+const ENC = 'a'.repeat(64);
 
 // grammY needs bot.botInfo before it will process an update. Setting it here
 // (rather than calling bot.init()) avoids a real getMe network call in tests.
@@ -28,7 +30,7 @@ function fakeUpdate(update_id: number, overrides: Record<string, unknown>) {
 
 function buildTestBot() {
   const db = openDb(':memory:');
-  const bot = buildBot({ botToken: BOT_TOKEN, miniappUrl: MINIAPP_URL, db });
+  const bot = buildBot({ botToken: BOT_TOKEN, miniappUrl: MINIAPP_URL, db, encKey: ENC });
   bot.botInfo = BOT_INFO;
   const captured: { method: string; payload: any }[] = [];
   // API transformer: intercepts outgoing calls (e.g. sendMessage) without hitting the network.
@@ -74,5 +76,25 @@ describe('buildBot', () => {
     const sendCalls = captured.filter((c) => c.method === 'sendMessage');
     expect(sendCalls.length).toBe(1);
     expect(sendCalls[0]!.payload.text).toMatch(/удал/i);
+  });
+
+  it('a follow-up reply button records the response and answers the callback', async () => {
+    const { db, bot, captured } = buildTestBot();
+    const { id: userId } = usersRepo(db).upsertByTgId(4242, 'ivan', 'ru');
+    const { id } = followUpsRepo(db, ENC).schedule(userId, 'card-1', 'Позвонить', Date.now());
+
+    await bot.handleUpdate({
+      update_id: 3,
+      callback_query: {
+        id: 'cq1', chat_instance: 'ci',
+        from: { id: 4242, is_bot: false, first_name: 'Ivan' },
+        message: { message_id: 9, date: Math.floor(Date.now() / 1000), chat: { id: 4242, type: 'private' }, from: BOT_INFO },
+        data: `followup:${id}:done`,
+      },
+    } as any);
+
+    const row = db.prepare('SELECT response FROM follow_ups WHERE id = ?').get(id) as any;
+    expect(row.response).toBe('done');
+    expect(captured.some((c) => c.method === 'answerCallbackQuery')).toBe(true);
   });
 });

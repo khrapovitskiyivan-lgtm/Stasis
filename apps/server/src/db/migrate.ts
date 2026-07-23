@@ -8,7 +8,8 @@ export function runMigrations(db: Db): void {
       username    TEXT,
       lang        TEXT,
       created_at  INTEGER NOT NULL,
-      deleted_at  INTEGER
+      deleted_at  INTEGER,
+      followups_opt_out INTEGER NOT NULL DEFAULT 0
     );
   `);
   db.exec(`

@@ -10,7 +10,7 @@ const content = loadContent(process.cwd());
 const db = openDb(cfg.dbPath);
 
 // Bot side is optional: only wire it up once a token and Mini App URL exist.
-const bot = cfg.botToken && cfg.miniappUrl ? buildBot({ botToken: cfg.botToken, miniappUrl: cfg.miniappUrl, db }) : undefined;
+const bot = cfg.botToken && cfg.miniappUrl ? buildBot({ botToken: cfg.botToken, miniappUrl: cfg.miniappUrl, db, encKey: cfg.encKey }) : undefined;
 
 // Follow-up nudges only make sense once the bot can actually message users.
 if (bot) startScheduler(db, cfg.encKey, bot);

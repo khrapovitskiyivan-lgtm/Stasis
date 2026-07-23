@@ -72,6 +72,18 @@ describe('followUpsRepo', () => {
 
     expect(repo.due(now + 3 * DAY + 1)).toEqual([]);
   });
+
+  it('unsubscribe persists: a follow-up scheduled AFTER opting out is never due', () => {
+    const db = openDb(':memory:');
+    const { id: userId } = usersRepo(db).upsertByTgId(46, 'ivan5', 'ru');
+    const repo = followUpsRepo(db, ENC);
+    const now = Date.now();
+
+    repo.unsubscribe(userId); // opt out first, with no pending rows
+    repo.schedule(userId, 'card-x', 'Позже', now + 3 * DAY); // then take a step later
+
+    expect(repo.due(now + 3 * DAY + 1)).toEqual([]); // still silenced
+  });
 });
 
 describe('runDueFollowUps', () => {

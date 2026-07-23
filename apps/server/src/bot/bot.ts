@@ -1,8 +1,9 @@
 import { Bot, InlineKeyboard } from 'grammy';
 import type { Db } from '../db/connection.js';
 import { deleteUserData } from '../db/deletion.js';
+import { followUpsRepo } from '../db/followups.repo.js';
 
-export function buildBot(deps: { botToken: string; miniappUrl: string; db: Db }): Bot {
+export function buildBot(deps: { botToken: string; miniappUrl: string; db: Db; encKey?: string }): Bot {
   const bot = new Bot(deps.botToken);
 
   bot.command('start', async (ctx) => {
@@ -20,6 +21,18 @@ export function buildBot(deps: { botToken: string; miniappUrl: string; db: Db })
     deleteUserData(deps.db, tgUserId);
     await ctx.reply('Ваши данные удалены.');
   });
+
+  // Follow-up nudge reply buttons (callback_data = `followup:<id>:<done|partial|failed>`).
+  // Wired only when an encryption key is available (needed to build the repo).
+  if (deps.encKey) {
+    const followUps = followUpsRepo(deps.db, deps.encKey);
+    bot.on('callback_query:data', async (ctx) => {
+      const m = /^followup:(\d+):(done|partial|failed)$/.exec(ctx.callbackQuery.data);
+      if (!m) return ctx.answerCallbackQuery();
+      followUps.recordReply(Number(m[1]), m[2]);
+      return ctx.answerCallbackQuery({ text: 'Спасибо, записал.' });
+    });
+  }
 
   return bot;
 }
