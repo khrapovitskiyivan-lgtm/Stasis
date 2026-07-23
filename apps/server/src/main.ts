@@ -25,6 +25,7 @@ const app = buildApp({
   webhookSecret: cfg.webhookSecret,
   publicBaseUrl: cfg.publicBaseUrl,
   tgShareBaseUrl: cfg.tgShareBaseUrl,
+  region: cfg.region,
 });
 
 app.listen({ port: cfg.port, host: '0.0.0.0' }).then(async () => {

@@ -2,7 +2,7 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import type { Bot } from 'grammy';
 import type { Db } from './db/connection.js';
 import { usersRepo } from './db/users.repo.js';
-import { runsRepo } from './db/runs.repo.js';
+import { runsRepo, ENGINE_VERSION } from './db/runs.repo.js';
 import { signalsRepo, isSignalEvent } from './db/signals.repo.js';
 import { consentsRepo } from './db/consents.repo.js';
 import { sharesRepo } from './db/shares.repo.js';
@@ -38,8 +38,10 @@ export function buildApp(deps: {
   webhookSecret?: string;
   publicBaseUrl?: string;
   tgShareBaseUrl?: string;
+  region?: 'ru' | 'eu';
 }): FastifyInstance {
   const app = Fastify({ logger: false });
+  const region = deps.region ?? 'ru';
   const users = usersRepo(deps.db);
   const runs = runsRepo(deps.db, deps.encKey);
   const signals = signalsRepo(deps.db);
@@ -57,6 +59,11 @@ export function buildApp(deps: {
   if (deps.bot) {
     app.post('/webhook', webhookHandler(deps.bot, deps.webhookSecret ?? ''));
   }
+
+  // Public: liveness/deploy-sanity check. No auth, no DB access.
+  app.get('/health', async () => {
+    return { ok: true, region, engineVersion: ENGINE_VERSION };
+  });
 
   app.post('/auth', async (req, reply) => {
     const header = req.headers.authorization ?? '';

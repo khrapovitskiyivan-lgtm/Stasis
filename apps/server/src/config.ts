@@ -1,5 +1,7 @@
+import { REGIONS, type Region } from './regions.js';
+
 export function loadConfig() {
-  const { BOT_TOKEN, JWT_SECRET, DATABASE_PATH, PORT, DATA_ENC_KEY, WEBHOOK_SECRET, MINIAPP_URL, PUBLIC_BASE_URL, TG_SHARE_BASE_URL } = process.env;
+  const { BOT_TOKEN, JWT_SECRET, DATABASE_PATH, PORT, DATA_ENC_KEY, WEBHOOK_SECRET, MINIAPP_URL, PUBLIC_BASE_URL, TG_SHARE_BASE_URL, REGION } = process.env;
   if (!BOT_TOKEN) throw new Error('BOT_TOKEN is required');
   if (!JWT_SECRET) throw new Error('JWT_SECRET is required');
   if (!DATA_ENC_KEY) throw new Error('DATA_ENC_KEY is required');
@@ -8,7 +10,12 @@ export function loadConfig() {
   // A public webhook MUST have a secret — otherwise a forged update could invoke
   // privileged bot commands (e.g. /delete_my_data) for any tg id. Refuse to boot.
   if (PUBLIC_BASE_URL && !WEBHOOK_SECRET) throw new Error('WEBHOOK_SECRET is required when PUBLIC_BASE_URL is set');
+  const region = (REGION ?? 'ru') as Region;
+  // Fail fast at startup on a typo'd/unsupported region rather than serving
+  // wrong crisis-support copy or data-residency claims at runtime.
+  if (!(region in REGIONS)) throw new Error('unknown region: ' + region);
   return {
+    region,
     botToken: BOT_TOKEN,
     jwtSecret: JWT_SECRET,
     dbPath: DATABASE_PATH ?? './data/stasis.sqlite',

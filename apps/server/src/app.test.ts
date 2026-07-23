@@ -53,4 +53,15 @@ describe('app', () => {
     const res = await app.inject({ method: 'GET', url: '/me', headers: { authorization: 'Bearer nope' } });
     expect(res.statusCode).toBe(401);
   });
+
+  it('GET /health returns ok, region, and engineVersion with no auth', async () => {
+    const app = buildApp({ db: openDb(':memory:'), botToken: BOT, jwtSecret: SECRET, encKey: ENC, content });
+    const res = await app.inject({ method: 'GET', url: '/health' });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.ok).toBe(true);
+    expect(typeof body.region).toBe('string');
+    expect(body.region.length).toBeGreaterThan(0);
+    expect(typeof body.engineVersion).toBe('string');
+  });
 });
