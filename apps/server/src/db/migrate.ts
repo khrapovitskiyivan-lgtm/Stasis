@@ -31,4 +31,13 @@ export function runMigrations(db: Db): void {
       engine_version TEXT NOT NULL, content_version TEXT NOT NULL, created_at INTEGER NOT NULL
     );
   `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS signals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      event TEXT NOT NULL,
+      meta TEXT,
+      created_at INTEGER NOT NULL
+    );
+  `);
 }
