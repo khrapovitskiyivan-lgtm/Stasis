@@ -82,9 +82,14 @@ export function validateContent(b: ContentBundle): void {
   const fail = (m: string) => { throw new ContentError(m); };
   for (const a of AREAS) if (!b.sphereInsights[a]) fail(`missing sphereInsight ${a}`);
   if (b.strategyTest.items.length !== 16) fail('strategyTest must have 16 items');
+  const byStrat = (s: Strategy) => b.strategyTest.items.filter((i) => i.loads === s).length;
+  for (const s of STRATEGIES) if (byStrat(s) !== 4) fail(`strategy ${s} must have 4 test items, got ${byStrat(s)}`);
   const pairs = new Set(b.interactionGuides.map((g) => `${g.you}:${g.other}`));
   if (pairs.size !== 16) fail(`interactionGuides must cover 16 directed pairs, got ${pairs.size}`);
   for (const s of STRATEGIES) if (!b.strategies[s]) fail(`missing strategy profile ${s}`);
+  // resource items feed the safety/distress screen — guard their keys explicitly.
+  for (const ri of b.resourceItems) if (ri.key !== 'direct' && ri.key !== 'distress') fail(`resource item ${ri.id} has invalid key "${ri.key}"`);
+  if (!b.resourceItems.some((ri) => ri.key === 'distress')) fail('resource items must include at least one distress marker');
   const byEl = (el: Element) => b.elementItems.filter((i) => i.loads === el).length;
   for (const el of ELEMENTS) if (byEl(el) !== 6) fail(`element ${el} must have 6 items, got ${byEl(el)}`);
   // forbidden lexicon across all human-facing strings
