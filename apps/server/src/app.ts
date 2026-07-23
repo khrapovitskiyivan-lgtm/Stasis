@@ -6,6 +6,7 @@ import { verifyInitData, InitDataError } from './auth/init-data.js';
 import { issueSession, verifySession, SessionError } from './auth/session.js';
 import { SubmitPayloadSchema } from '@stasis/shared';
 import { computeProfile } from './engine/index.js';
+import { renderResult } from './engine/render.js';
 import type { ContentBundle } from './content/loader.js';
 
 const AUTH_MAX_AGE_SEC = 3 * 3600;
@@ -63,7 +64,7 @@ export function buildApp(deps: { db: Db; botToken: string; jwtSecret: string; en
     if (!parsed.success) return reply.code(400).send({ error: 'invalid_payload' });
     const profile = computeProfile(parsed.data.elementAnswers, parsed.data.strategyAnswers, parsed.data.wheel, parsed.data.resourceAnswers, deps.content);
     const { profileId } = runs.saveRun(userId, parsed.data, profile, deps.content.version);
-    return { profileId, result: profile };
+    return { profileId, result: renderResult(profile, deps.content) };
   });
 
   return app;

@@ -75,3 +75,12 @@ export const InteractionGuideSchema = z.object({
   collision: z.string().min(1), howTo: z.array(z.string().min(1)).min(1),
 });
 export type InteractionGuide = z.infer<typeof InteractionGuideSchema>;
+
+export const RenderedResultSchema = z.object({
+  leadElement: elementEnum, secondElement: elementEnum.nullable(), isMixed: z.boolean(),
+  resourceState: z.enum(['ok', 'low', 'critical']),
+  sphereInsight: SphereInsightSchema,
+  beliefCards: z.array(BeliefCardSchema),
+  strategy: z.object({ lead: StrategyProfileSchema, guides: z.array(InteractionGuideSchema) }),
+});
+export type RenderedResult = z.infer<typeof RenderedResultSchema>;
