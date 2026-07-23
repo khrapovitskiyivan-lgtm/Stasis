@@ -1,0 +1,123 @@
+:root {
+  color-scheme: light dark;
+}
+
+/* Light theme (default) — warm, calm neutrals */
+:root,
+[data-theme='light'] {
+  --color-bg: #f7f5f1;
+  --color-surface: #ffffff;
+  --color-surface-raised: #fbfaf8;
+  --color-text: #232120;
+  --color-text-muted: #6f6b66;
+  --color-border: #e6e2db;
+
+  --color-fire: #d97a52;
+  --color-water: #4f8fa8;
+  --color-air: #a8a4d9;
+  --color-earth: #7c9473;
+
+  --color-accent: var(--color-fire);
+  --shadow-soft: 0 1px 2px rgba(35, 33, 32, 0.04), 0 8px 24px rgba(35, 33, 32, 0.06);
+}
+
+/* Dark theme — deep, soft, not clinical black */
+[data-theme='dark'] {
+  --color-bg: #17181a;
+  --color-surface: #202225;
+  --color-surface-raised: #26282c;
+  --color-text: #ecebe8;
+  --color-text-muted: #a4a19c;
+  --color-border: #34363a;
+
+  --color-fire: #e08f68;
+  --color-water: #6ba9c2;
+  --color-air: #b8b4e6;
+  --color-earth: #8fab84;
+
+  --color-accent: var(--color-fire);
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.app-shell {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2.5rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+
+.app-title {
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+
+.app-subtitle {
+  margin: 0.75rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 1rem;
+  line-height: 1.5;
+  max-width: 28ch;
+}
+
+.app-elements {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.app-elements span {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.app-elements .fire { background: var(--color-fire); }
+.app-elements .water { background: var(--color-water); }
+.app-elements .air { background: var(--color-air); }
+.app-elements .earth { background: var(--color-earth); }
+
+.app-start-button {
+  appearance: none;
+  border: none;
+  border-radius: 999px;
+  padding: 0.9rem 2.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-surface);
+  background: var(--color-accent);
+  box-shadow: var(--shadow-soft);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.app-start-button:hover {
+  transform: translateY(-1px);
+}
+
+.app-start-button:active {
+  transform: translateY(0);
+}
