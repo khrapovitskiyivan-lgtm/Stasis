@@ -1,8 +1,11 @@
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
+import fastifyStatic from '@fastify/static';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import type { Bot } from 'grammy';
 import type { Db } from './db/connection.js';
 import { usersRepo } from './db/users.repo.js';
-import { runsRepo } from './db/runs.repo.js';
+import { runsRepo, ENGINE_VERSION } from './db/runs.repo.js';
 import { signalsRepo, isSignalEvent } from './db/signals.repo.js';
 import { consentsRepo } from './db/consents.repo.js';
 import { sharesRepo } from './db/shares.repo.js';
@@ -38,8 +41,15 @@ export function buildApp(deps: {
   webhookSecret?: string;
   publicBaseUrl?: string;
   tgShareBaseUrl?: string;
+  region?: 'ru' | 'eu';
+  // Absolute path to the built Mini App `dist` (index.html + assets). When
+  // set and the dir exists, the API origin also serves the SPA — see the
+  // static registration + notFoundHandler below. Left unset in dev/tests so
+  // `GET /` stays a plain 404 rather than silently serving stale/missing files.
+  miniappDist?: string;
 }): FastifyInstance {
   const app = Fastify({ logger: false });
+  const region = deps.region ?? 'ru';
   const users = usersRepo(deps.db);
   const runs = runsRepo(deps.db, deps.encKey);
   const signals = signalsRepo(deps.db);
@@ -57,6 +67,11 @@ export function buildApp(deps: {
   if (deps.bot) {
     app.post('/webhook', webhookHandler(deps.bot, deps.webhookSecret ?? ''));
   }
+
+  // Public: liveness/deploy-sanity check. No auth, no DB access.
+  app.get('/health', async () => {
+    return { ok: true, region, engineVersion: ENGINE_VERSION };
+  });
 
   app.post('/auth', async (req, reply) => {
     const header = req.headers.authorization ?? '';
@@ -223,6 +238,30 @@ export function buildApp(deps: {
     followUps.unsubscribe(userId);
     return { ok: true };
   });
+
+  // Serve the Mini App SPA from this same origin (single TLS cert, single
+  // web_app URL for Telegram). Only wired up when a built dist is provided —
+  // dev/tests without it keep `GET /` as a plain 404. `wildcard: false` means
+  // @fastify/static only serves exact file matches (assets); it does NOT
+  // register a catch-all route, so unmatched paths still fall through to
+  // notFoundHandler below, which is where the SPA (index.html) fallback lives.
+  if (deps.miniappDist && existsSync(deps.miniappDist)) {
+    const miniappDist = deps.miniappDist;
+    app.register(fastifyStatic, { root: miniappDist, wildcard: false });
+
+    // Requests under these prefixes are API routes: if none of them matched
+    // (typo'd path, wrong method, etc.) the caller gets a JSON 404, never the
+    // SPA's index.html. Everything else on GET is assumed to be a client-side
+    // route the React Mini App router owns, so it gets index.html instead.
+    const API_PREFIXES = ['/auth', '/me', '/submit', '/assessment', '/signal', '/consent', '/share', '/followup', '/webhook', '/health'];
+    app.setNotFoundHandler((req, reply) => {
+      const isApiPath = API_PREFIXES.some((p) => req.url === p || req.url.startsWith(p + '/') || req.url.startsWith(p + '?'));
+      if (req.method === 'GET' && !isApiPath) {
+        return reply.sendFile('index.html', miniappDist);
+      }
+      return reply.code(404).send({ error: 'not_found' });
+    });
+  }
 
   return app;
 }

@@ -1,0 +1,33 @@
+# Single-VM deploy: one Node process (bot + API + Mini App) behind Caddy (auto-HTTPS).
+# Bring up with:  DOMAIN=your.domain docker compose up -d --build
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env            # BOT_TOKEN, JWT_SECRET, DATA_ENC_KEY, WEBHOOK_SECRET,
+                              # PUBLIC_BASE_URL, MINIAPP_URL, TG_SHARE_BASE_URL, REGION, VITE_* …
+    environment:
+      - PORT=3000
+    volumes:
+      - ./data:/app/data      # SQLite file persists across restarts/rebuilds
+    expose:
+      - "3000"                # internal only; Caddy terminates TLS and proxies in
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN}      # e.g. stasis.example.ru — must resolve to this VM's IP
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data      # Let's Encrypt certs — keep this volume
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -1,10 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { sign } from '@telegram-apps/init-data-node';
 import { openDb } from './db/connection.js';
 import { buildApp } from './app.js';
 import { loadContent } from './content/loader.js';
 import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+import { dirname, resolve, join } from 'node:path';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 
 const BOT = '123456:TESTTOKEN';
 const SECRET = 'test-secret';
@@ -52,5 +54,76 @@ describe('app', () => {
     const app = buildApp({ db: openDb(':memory:'), botToken: BOT, jwtSecret: SECRET, encKey: ENC, content });
     const res = await app.inject({ method: 'GET', url: '/me', headers: { authorization: 'Bearer nope' } });
     expect(res.statusCode).toBe(401);
+  });
+
+  it('GET /health returns ok, region, and engineVersion with no auth', async () => {
+    const app = buildApp({ db: openDb(':memory:'), botToken: BOT, jwtSecret: SECRET, encKey: ENC, content });
+    const res = await app.inject({ method: 'GET', url: '/health' });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.ok).toBe(true);
+    expect(typeof body.region).toBe('string');
+    expect(body.region.length).toBeGreaterThan(0);
+    expect(typeof body.engineVersion).toBe('string');
+  });
+});
+
+describe('app static (Mini App SPA)', () => {
+  let tmpDir: string | undefined;
+
+  afterEach(() => {
+    if (tmpDir) {
+      rmSync(tmpDir, { recursive: true, force: true });
+      tmpDir = undefined;
+    }
+  });
+
+  function makeMiniappDist(): string {
+    const dir = mkdtempSync(join(tmpdir(), 'stasis-miniapp-'));
+    writeFileSync(join(dir, 'index.html'), '<!doctype html><title>Stasis</title><body>STASIS_MINIAPP_FIXTURE</body>');
+    tmpDir = dir;
+    return dir;
+  }
+
+  it('GET / serves the Mini App index.html when miniappDist is configured', async () => {
+    const dist = makeMiniappDist();
+    const app = buildApp({ db: openDb(':memory:'), botToken: BOT, jwtSecret: SECRET, encKey: ENC, content, miniappDist: dist });
+    const res = await app.inject({ method: 'GET', url: '/' });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toContain('text/html');
+    expect(res.body).toContain('STASIS_MINIAPP_FIXTURE');
+  });
+
+  it('GET /some/spa/route falls back to index.html for unmatched non-API GETs', async () => {
+    const dist = makeMiniappDist();
+    const app = buildApp({ db: openDb(':memory:'), botToken: BOT, jwtSecret: SECRET, encKey: ENC, content, miniappDist: dist });
+    const res = await app.inject({ method: 'GET', url: '/some/spa/route' });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toContain('text/html');
+    expect(res.body).toContain('STASIS_MINIAPP_FIXTURE');
+  });
+
+  it('GET /assessment still returns API JSON, not shadowed by static/SPA fallback', async () => {
+    const dist = makeMiniappDist();
+    const app = buildApp({ db: openDb(':memory:'), botToken: BOT, jwtSecret: SECRET, encKey: ENC, content, miniappDist: dist });
+    const res = await app.inject({ method: 'GET', url: '/assessment' });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toContain('application/json');
+    const body = res.json();
+    expect(Array.isArray(body.wheelAreas)).toBe(true);
+  });
+
+  it('POST /nope still returns a JSON 404 (fallback is GET-only)', async () => {
+    const dist = makeMiniappDist();
+    const app = buildApp({ db: openDb(':memory:'), botToken: BOT, jwtSecret: SECRET, encKey: ENC, content, miniappDist: dist });
+    const res = await app.inject({ method: 'POST', url: '/nope' });
+    expect(res.statusCode).toBe(404);
+    expect(res.headers['content-type']).toContain('application/json');
+  });
+
+  it('GET / is a 404 when miniappDist is not configured (dev/tests)', async () => {
+    const app = buildApp({ db: openDb(':memory:'), botToken: BOT, jwtSecret: SECRET, encKey: ENC, content });
+    const res = await app.inject({ method: 'GET', url: '/' });
+    expect(res.statusCode).toBe(404);
   });
 });

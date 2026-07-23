@@ -1,0 +1,17 @@
+# Keep the build context small and never leak secrets/local state into the image.
+.git
+.gitignore
+node_modules
+**/node_modules
+**/dist
+data
+*.sqlite
+*.sqlite-*
+.env
+.env.*
+!.env.example
+.superpowers
+docs
+*.md
+!apps/miniapp/public
+tmp
