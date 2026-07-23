@@ -28,17 +28,22 @@ export function App() {
 
   const [state, dispatch] = useReducer(flowReducer, initialFlow);
 
+  const loadAssessment = useCallback((client: Api) => {
+    setLoadError(null);
+    client
+      .getAssessment()
+      .then(setAssessment)
+      .catch(() => setLoadError('Не удалось загрузить вопросы.'));
+  }, []);
+
   // Bootstrap: telegram bridge -> api client -> public assessment (no auth needed).
   useEffect(() => {
     const ctx = initTelegram();
     setTheme(ctx.theme);
     const nextApi = createApi(BASE_URL, ctx.initDataRaw);
     setApi(nextApi);
-    nextApi
-      .getAssessment()
-      .then(setAssessment)
-      .catch(() => setLoadError('Не удалось загрузить вопросы. Попробуйте перезапустить приложение.'));
-  }, []);
+    loadAssessment(nextApi);
+  }, [loadAssessment]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -157,7 +162,16 @@ export function App() {
 
   return (
     <div className="app-shell" data-theme={theme}>
-      {loadError ? <p className="screen-text app-load-error">{loadError}</p> : null}
+      {loadError ? (
+        <div className="app-load-error">
+          <p className="screen-text">{loadError}</p>
+          {api ? (
+            <button type="button" className="btn-primary" onClick={() => loadAssessment(api)}>
+              Повторить
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {content}
     </div>
   );
