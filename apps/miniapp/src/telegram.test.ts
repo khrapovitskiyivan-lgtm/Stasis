@@ -1,13 +1,16 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { initTelegram } from './telegram.js';
 
 describe('initTelegram', () => {
   beforeEach(() => { (globalThis as any).window = globalThis; delete (globalThis as any).Telegram; delete (globalThis as any).__VITE_DEV_INIT_DATA__; });
-  it('reads initData + theme from the Telegram bridge', () => {
-    (globalThis as any).Telegram = { WebApp: { initData: 'raw123', colorScheme: 'dark', ready() {}, expand() {} } };
+  it('reads initData + theme from the Telegram bridge and readies it', () => {
+    const ready = vi.fn(), expand = vi.fn();
+    (globalThis as any).Telegram = { WebApp: { initData: 'raw123', colorScheme: 'dark', ready, expand } };
     const r = initTelegram();
     expect(r.initDataRaw).toBe('raw123');
     expect(r.theme).toBe('dark');
+    expect(ready).toHaveBeenCalled();
+    expect(expand).toHaveBeenCalled();
   });
   it('falls back to dev env when no bridge', () => {
     // import.meta.env is resolved once at process start by Vite/Vitest and cannot be
