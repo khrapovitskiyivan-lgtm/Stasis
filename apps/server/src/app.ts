@@ -57,6 +57,8 @@ export function buildApp(deps: { db: Db; botToken: string; jwtSecret: string; en
       if (e instanceof SessionError) return reply.code(401).send({ error: 'invalid_session' });
       throw e;
     }
+    // Parity with /me: a valid token whose user row is gone (deleted/orphaned) must not persist.
+    if (!users.getById(userId)) return reply.code(401).send({ error: 'invalid_session' });
     const parsed = SubmitPayloadSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'invalid_payload' });
     const profile = computeProfile(parsed.data.elementAnswers, parsed.data.strategyAnswers, parsed.data.wheel, parsed.data.resourceAnswers, deps.content);

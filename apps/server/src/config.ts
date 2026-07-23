@@ -3,6 +3,8 @@ export function loadConfig() {
   if (!BOT_TOKEN) throw new Error('BOT_TOKEN is required');
   if (!JWT_SECRET) throw new Error('JWT_SECRET is required');
   if (!DATA_ENC_KEY) throw new Error('DATA_ENC_KEY is required');
+  // Fail fast at startup rather than 500-ing on the first /submit with a bad key.
+  if (!/^[0-9a-fA-F]{64}$/.test(DATA_ENC_KEY)) throw new Error('DATA_ENC_KEY must be 32 bytes hex (64 chars)');
   return {
     botToken: BOT_TOKEN,
     jwtSecret: JWT_SECRET,

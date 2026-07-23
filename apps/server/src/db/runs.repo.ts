@@ -13,8 +13,9 @@ export function runsRepo(db: Db, encKey: string) {
     VALUES (?, ?, ?, ?, ?, ?, ?)`);
   const insProfile = db.prepare(`INSERT INTO profiles
     (test_run_id, user_id, lead_element, second_element, is_mixed, weak_areas, resource_state,
-     belief_card_ids, lead_strategy, second_strategy, guide_refs, engine_version, content_version, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+     belief_card_ids, lead_strategy, second_strategy, is_strategy_mixed, guide_refs,
+     engine_version, content_version, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
   return {
     saveRun(userId: number, payload: SubmitPayload, profile: Profile, contentVersion: string): { profileId: number } {
@@ -26,7 +27,7 @@ export function runsRepo(db: Db, encKey: string) {
       const p = insProfile.run(testRunId, userId, profile.leadElement, profile.secondElement ?? null,
         profile.isMixed ? 1 : 0, JSON.stringify(profile.weakAreas), profile.resourceState,
         JSON.stringify(profile.beliefCardIds), profile.leadStrategy, profile.secondStrategy ?? null,
-        JSON.stringify(profile.guideRefs), ENGINE_VERSION, contentVersion, now);
+        profile.isStrategyMixed ? 1 : 0, JSON.stringify(profile.guideRefs), ENGINE_VERSION, contentVersion, now);
       return { profileId: Number(p.lastInsertRowid) };
     },
   };
