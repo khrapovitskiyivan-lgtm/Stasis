@@ -90,6 +90,8 @@ export function flowReducer(state: FlowState, action: FlowAction): FlowState {
     }
 
     case 'goto':
+      // Same consent gate as `next`: can't land on any post-consent step until consent is given.
+      if (action.step !== 'consent' && !state.consentGiven) return state;
       return { ...state, step: action.step };
 
     default:

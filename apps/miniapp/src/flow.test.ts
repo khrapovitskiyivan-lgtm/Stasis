@@ -43,9 +43,15 @@ describe('flowReducer', () => {
     expect(state.step).toBe('consent');
   });
 
-  it('goto jumps directly to any step', () => {
-    const state = flowReducer(initialFlow, { type: 'goto', step: 'result' });
+  it('goto jumps directly to any step once consent is given', () => {
+    const consented = flowReducer(initialFlow, { type: 'giveConsent' });
+    const state = flowReducer(consented, { type: 'goto', step: 'result' });
     expect(state.step).toBe('result');
+  });
+
+  it('goto to a post-consent step is a no-op until consent is given', () => {
+    const state = flowReducer(initialFlow, { type: 'goto', step: 'wheel' });
+    expect(state.step).toBe('consent'); // gated, same as next
   });
 
   it('setWheel updates a single area without touching others', () => {

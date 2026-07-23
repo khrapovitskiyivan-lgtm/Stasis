@@ -4,6 +4,7 @@ import { AREAS } from '@stasis/shared';
 export interface WheelProps {
   values: Partial<WheelScores>;
   onChange: (area: Area, value: number) => void;
+  ariaLabel?: string;
 }
 
 const MIN = 1;
@@ -27,7 +28,7 @@ function pointForValue(index: number, value: number): { x: number; y: number } {
   };
 }
 
-export function Wheel({ values, onChange }: WheelProps) {
+export function Wheel({ values, onChange, ariaLabel }: WheelProps) {
   const resolved = AREAS.map((area) => values[area] ?? DEFAULT_VALUE);
   const highestValue = Math.max(...resolved);
   const highestIndex = resolved.indexOf(highestValue);
@@ -43,7 +44,7 @@ export function Wheel({ values, onChange }: WheelProps) {
         className="wheel-svg"
         viewBox={`0 0 ${SIZE} ${SIZE}`}
         role="img"
-        aria-label="Колесо баланса"
+        aria-label={ariaLabel ?? 'balance wheel'}
       >
         {AREAS.map((_, i) => {
           const { x, y } = pointForValue(i, MAX);
