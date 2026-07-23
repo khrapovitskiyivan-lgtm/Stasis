@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import type { RenderedResult } from '@stasis/shared';
 import { AREAS } from '@stasis/shared';
@@ -41,39 +41,44 @@ vi.mock('./api.js', () => ({
   createApi: () => mockApi,
 }));
 
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockApi.authed.mockResolvedValue(undefined);
+  mockApi.getAssessment.mockResolvedValue(fixtureAssessment);
+  mockApi.submit.mockResolvedValue({ profileId: 1, result: fixtureResult });
+  mockApi.signal.mockResolvedValue(undefined);
+});
+
+async function driveToResult() {
+  render(<App />);
+  // consent: all 3 checkboxes then continue
+  for (const cb of screen.getAllByRole('checkbox')) fireEvent.click(cb);
+  fireEvent.click(screen.getByRole('button', { name: /продолжить/i }));
+  // intro
+  fireEvent.click(await screen.findByRole('button', { name: /начать/i }));
+  // wheel: set all 6 areas to 7 (not the default 5, so onChange fires)
+  await screen.findByRole('slider', { name: 'health' });
+  for (const area of AREAS) {
+    fireEvent.change(screen.getByRole('slider', { name: area }), { target: { value: '7' } });
+  }
+  fireEvent.click(screen.getByRole('button', { name: /продолжить/i }));
+  // resource
+  await screen.findByText(fixtureAssessment.resourceItems[0].statement);
+  fireEvent.click(screen.getAllByRole('radio')[0]);
+  fireEvent.click(screen.getByRole('button', { name: /продолжить/i }));
+  // miniInsight is skipped -> elements
+  await screen.findByText(fixtureAssessment.elementItems[0].statement);
+  fireEvent.click(screen.getAllByRole('radio')[2]);
+  fireEvent.click(screen.getByRole('button', { name: /продолжить/i }));
+  // strategy
+  await screen.findByText(fixtureAssessment.strategyItems[0].situation);
+  fireEvent.click(screen.getAllByRole('radio')[3]);
+  fireEvent.click(screen.getByRole('button', { name: /продолжить/i }));
+}
+
 describe('App flow smoke test', () => {
   it('drives consent -> intro -> wheel -> resource -> elements -> strategy -> result with a mocked api', async () => {
-    render(<App />);
-
-    // consent: all 3 checkboxes then continue
-    for (const cb of screen.getAllByRole('checkbox')) fireEvent.click(cb);
-    fireEvent.click(screen.getByRole('button', { name: /продолжить/i }));
-
-    // intro
-    fireEvent.click(await screen.findByRole('button', { name: /начать/i }));
-
-    // wheel: set all 6 areas then continue (7, not the slider's default of 5,
-    // so React actually registers the change and fires onChange)
-    await screen.findByRole('slider', { name: 'health' });
-    for (const area of AREAS) {
-      fireEvent.change(screen.getByRole('slider', { name: area }), { target: { value: '7' } });
-    }
-    fireEvent.click(screen.getByRole('button', { name: /продолжить/i }));
-
-    // resource (assessment-backed)
-    await screen.findByText(fixtureAssessment.resourceItems[0].statement);
-    fireEvent.click(screen.getAllByRole('radio')[0]);
-    fireEvent.click(screen.getByRole('button', { name: /продолжить/i }));
-
-    // miniInsight is skipped by the container -> lands directly on elements
-    await screen.findByText(fixtureAssessment.elementItems[0].statement);
-    fireEvent.click(screen.getAllByRole('radio')[2]);
-    fireEvent.click(screen.getByRole('button', { name: /продолжить/i }));
-
-    // strategy
-    await screen.findByText(fixtureAssessment.strategyItems[0].situation);
-    fireEvent.click(screen.getAllByRole('radio')[3]);
-    fireEvent.click(screen.getByRole('button', { name: /продолжить/i }));
+    await driveToResult();
 
     // result: submitted via the mocked api and rendered
     await waitFor(() => expect(mockApi.submit).toHaveBeenCalledTimes(1));
@@ -89,5 +94,21 @@ describe('App flow smoke test', () => {
     // ResultScreen's onSignal is wired to api.signal
     fireEvent.click(screen.getByRole('button', { name: /точно про меня/i }));
     expect(mockApi.signal).toHaveBeenCalledWith('barnum_me', undefined);
+  });
+
+  it('does not auto-retry submit on failure; retries only on explicit user action', async () => {
+    mockApi.submit.mockRejectedValueOnce(new Error('network')); // first attempt fails
+    await driveToResult();
+
+    await screen.findByText(/не удалось получить результат/i);
+    expect(mockApi.submit).toHaveBeenCalledTimes(1);
+    // give the effect ample opportunity to (wrongly) loop
+    await new Promise((r) => setTimeout(r, 60));
+    expect(mockApi.submit).toHaveBeenCalledTimes(1); // no auto-retry loop
+
+    // explicit retry re-submits (default mock now resolves)
+    fireEvent.click(screen.getByRole('button', { name: /попробовать ещё раз/i }));
+    expect(await screen.findByText(/твой результат/i)).toBeInTheDocument();
+    expect(mockApi.submit).toHaveBeenCalledTimes(2);
   });
 });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { AREAS, type RenderedResult, type SubmitPayload } from '@stasis/shared';
 import { initTelegram } from './telegram.js';
 import { createApi, type Api, type Assessment } from './api.js';
@@ -21,6 +21,10 @@ export function App() {
   const [result, setResult] = useState<RenderedResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
+  // Guards the submit to exactly one in-flight attempt; a failure requires an
+  // explicit user retry (bumps retryNonce) rather than auto-looping the effect.
+  const submitAttempted = useRef(false);
 
   const [state, dispatch] = useReducer(flowReducer, initialFlow);
 
@@ -52,7 +56,8 @@ export function App() {
   // matrix, strategy profile, guides) is server-rendered IP and only exists
   // after this call.
   useEffect(() => {
-    if (state.step !== 'result' || !api || result || submitting) return;
+    if (state.step !== 'result' || !api || submitAttempted.current) return;
+    submitAttempted.current = true; // fire at most once per attempt; no auto-retry loop
     if (!AREAS.every((a) => state.wheel[a] != null)) {
       setSubmitError('Не все сферы колеса баланса заполнены.');
       return;
@@ -70,7 +75,14 @@ export function App() {
       .then(({ result: r }) => setResult(r))
       .catch(() => setSubmitError('Не удалось получить результат. Попробуйте ещё раз.'))
       .finally(() => setSubmitting(false));
-  }, [state.step, state.wheel, state.elementAnswers, state.strategyAnswers, state.resourceAnswers, api, result, submitting]);
+    // retryNonce is a dependency so an explicit retry (which resets the ref) re-runs this.
+  }, [state.step, api, retryNonce]);
+
+  const retrySubmit = useCallback(() => {
+    submitAttempted.current = false;
+    setSubmitError(null);
+    setRetryNonce((n) => n + 1);
+  }, []);
 
   const handleSignal = useCallback(
     (event: string, meta?: unknown) => {
@@ -127,7 +139,14 @@ export function App() {
       if (result) {
         content = <ResultScreen result={result} onSignal={handleSignal} onShare={handleShare} />;
       } else if (submitError) {
-        content = <p className="screen-text">{submitError}</p>;
+        content = (
+          <div className="screen">
+            <p className="screen-text">{submitError}</p>
+            <button type="button" className="btn-primary" onClick={retrySubmit}>
+              Попробовать ещё раз
+            </button>
+          </div>
+        );
       } else {
         content = <p className="screen-text">Считаем результат…</p>;
       }
