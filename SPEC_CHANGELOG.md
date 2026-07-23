@@ -6,6 +6,10 @@ Reference spec: `docs/superpowers/specs/2026-07-22-stasis-solo-mvp-design.md`.
 
 ---
 
+## 2026-07-23 — Pilot reframed as instrumented soft-launch
+
+- **The app IS the pilot.** Decision: don't run a separate pilot — the launched MVP collects the data. But instrumented, not vibes-only. Split the two signal types explicitly: (a) product signals in-app (это-не-про-меня, 1-tap «точно про меня / общо» anti-Barnum, share-rate, drop-off, follow-up reply) drive continuous product iteration; (b) psychometric validity is a single statistical pass (α/EFA/discriminant) at ~150–200 responses on the pseudonymized `/submit` answers — the only thing that proves the typology holds; positive feedback cannot substitute for it. Claims stay probabilistic until that pass. Updated spec §2 (result), §12.2; `docs/spec-first/track-map.md`. Implementation requirement added to Ф3/Ф4: capture product signals (no PII) + a small export/analysis harness.
+
 ## 2026-07-23 — Persistence + `POST /submit` (Phase 2, Task 6)
 
 - **`ENGINE_VERSION = '2.0.0'` introduced** as a literal constant in `apps/server/src/db/runs.repo.ts`, stamped onto every `profiles` row alongside `content_version`. Not previously named in the spec; recorded here per the brief's own drift note. No other behavior drift: crypto (AES-256-GCM, `iv:tag:ciphertext` hex encoding), the `test_runs`/`profiles` schema, `runsRepo.saveRun`, and the `/submit` contract (`200 {profileId, result}` / `400` bad body / `401` bad session) all match the brief's code as written.
