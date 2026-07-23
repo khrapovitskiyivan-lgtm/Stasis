@@ -54,14 +54,14 @@ export const SphereInsightSchema = z.object({
 export type SphereInsight = z.infer<typeof SphereInsightSchema>;
 
 export const StrategyProfileSchema = z.object({
-  name: z.string(), coreDrive: z.string(), childhoodLogic: z.string(),
-  underStress: z.string(), gift: z.string(), cost: z.string(), growthNudge: z.string(),
+  name: z.string().min(1), coreDrive: z.string().min(1), childhoodLogic: z.string().min(1),
+  underStress: z.string().min(1), gift: z.string().min(1), cost: z.string().min(1), growthNudge: z.string().min(1),
 });
 export type StrategyProfile = z.infer<typeof StrategyProfileSchema>;
 
 export const StrategyTestItemSchema = z.object({
   id: z.number().int(), loads: strategyEnum, key: z.enum(['direct', 'reverse']),
-  situation: z.string(), statement: z.string(),
+  situation: z.string().min(1), statement: z.string().min(1),
 });
 export type StrategyTestItem = z.infer<typeof StrategyTestItemSchema>;
 
@@ -72,6 +72,6 @@ export type ElementItemMeta = z.infer<typeof ElementItemMetaSchema>;
 
 export const InteractionGuideSchema = z.object({
   you: strategyEnum, other: strategyEnum,
-  collision: z.string(), howTo: z.array(z.string().min(1)).min(1),
+  collision: z.string().min(1), howTo: z.array(z.string().min(1)).min(1),
 });
 export type InteractionGuide = z.infer<typeof InteractionGuideSchema>;
