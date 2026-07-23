@@ -96,3 +96,27 @@ describe('POST /share + GET /share/:slug', () => {
     expect(noToken.statusCode).toBe(401);
   });
 });
+
+describe('GET /share/:slug/image.png', () => {
+  it('returns a cacheable PNG OG image for a real slug and 404 for an unknown one', async () => {
+    const app = buildApp({ db: openDb(':memory:'), botToken: BOT, jwtSecret: SECRET, encKey: ENC, content });
+    const t = await token(app);
+    const profileId = await submitProfile(app, t);
+    const shareRes = await app.inject({ method: 'POST', url: '/share', headers: { authorization: `Bearer ${t}` }, payload: { profileId } });
+    const { slug } = shareRes.json();
+
+    const imgRes = await app.inject({ method: 'GET', url: `/share/${slug}/image.png` });
+    expect(imgRes.statusCode).toBe(200);
+    expect(imgRes.headers['content-type']).toBe('image/png');
+    const buf = imgRes.rawPayload;
+    expect(buf.length).toBeGreaterThan(0);
+    expect([buf[0], buf[1], buf[2], buf[3]]).toEqual([0x89, 0x50, 0x4e, 0x47]);
+
+    // Second hit should be served from cache and return identical bytes.
+    const imgRes2 = await app.inject({ method: 'GET', url: `/share/${slug}/image.png` });
+    expect(imgRes2.rawPayload.equals(buf)).toBe(true);
+
+    const missing = await app.inject({ method: 'GET', url: '/share/does-not-exist-slug/image.png' });
+    expect(missing.statusCode).toBe(404);
+  });
+});

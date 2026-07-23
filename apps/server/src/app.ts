@@ -9,10 +9,11 @@ import { sharesRepo } from './db/shares.repo.js';
 import { profilesRepo } from './db/profiles.repo.js';
 import { verifyInitData, InitDataError } from './auth/init-data.js';
 import { issueSession, verifySession, SessionError } from './auth/session.js';
-import { SubmitPayloadSchema, ConsentPayloadSchema, AREAS } from '@stasis/shared';
+import { SubmitPayloadSchema, ConsentPayloadSchema, SharePublicPayloadSchema, AREAS } from '@stasis/shared';
 import { computeProfile } from './engine/index.js';
 import { renderResult } from './engine/render.js';
 import { buildSharePayload } from './share/payload.js';
+import { renderOgSvg, svgToPng } from './share/og-image.js';
 import type { ContentBundle } from './content/loader.js';
 import { webhookHandler } from './bot/webhook.js';
 
@@ -43,6 +44,10 @@ export function buildApp(deps: {
   const consents = consentsRepo(deps.db);
   const shares = sharesRepo(deps.db);
   const profiles = profilesRepo(deps.db);
+  // Per-slug OG image cache: the share payload is immutable once created, so
+  // a rendered PNG never goes stale. Lives for the process lifetime of this
+  // app instance (MVP-scale; a later optimization could move this to disk/CDN).
+  const ogImageCache = new Map<string, Buffer>();
 
   // Bot is optional (dev without BOT_TOKEN/MINIAPP_URL configured for the bot side).
   if (deps.bot) {
@@ -163,6 +168,24 @@ export function buildApp(deps: {
     const row = shares.getBySlug(slug);
     if (!row) return reply.code(404).send({ error: 'not_found' });
     return row.publicPayload;
+  });
+
+  // Public: OG/Telegram-preview PNG for a share slug. The payload is
+  // immutable once a slug exists, so we render lazily on first request and
+  // cache the PNG bytes in-memory per slug — no re-render on repeat hits.
+  app.get('/share/:slug/image.png', async (req, reply) => {
+    const { slug } = req.params as { slug: string };
+    const cached = ogImageCache.get(slug);
+    if (cached) return reply.type('image/png').send(cached);
+
+    const row = shares.getBySlug(slug);
+    if (!row) return reply.code(404).send({ error: 'not_found' });
+    const parsed = SharePublicPayloadSchema.safeParse(row.publicPayload);
+    if (!parsed.success) return reply.code(404).send({ error: 'not_found' });
+
+    const png = svgToPng(renderOgSvg(parsed.data));
+    ogImageCache.set(slug, png);
+    return reply.type('image/png').send(png);
   });
 
   return app;
