@@ -1,0 +1,6 @@
+# Auto-HTTPS via Let's Encrypt for $DOMAIN, reverse-proxied to the app container.
+# Requires: DOMAIN's DNS A/AAAA record points at this VM, and ports 80+443 are open.
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:3000
+}
