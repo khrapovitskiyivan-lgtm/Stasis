@@ -35,6 +35,7 @@ const mockApi = {
   getAssessment: vi.fn().mockResolvedValue(fixtureAssessment),
   submit: vi.fn().mockResolvedValue({ profileId: 1, result: fixtureResult }),
   signal: vi.fn().mockResolvedValue(undefined),
+  recordConsent: vi.fn().mockResolvedValue(undefined),
 };
 
 vi.mock('./api.js', () => ({
@@ -47,6 +48,7 @@ beforeEach(() => {
   mockApi.getAssessment.mockResolvedValue(fixtureAssessment);
   mockApi.submit.mockResolvedValue({ profileId: 1, result: fixtureResult });
   mockApi.signal.mockResolvedValue(undefined);
+  mockApi.recordConsent.mockResolvedValue(undefined);
 });
 
 async function driveToResult() {
@@ -79,6 +81,15 @@ async function driveToResult() {
 describe('App flow smoke test', () => {
   it('drives consent -> intro -> wheel -> resource -> elements -> strategy -> result with a mocked api', async () => {
     await driveToResult();
+
+    // consent recording fires once, after auth, with the current doc version
+    await waitFor(() => expect(mockApi.recordConsent).toHaveBeenCalledTimes(1));
+    expect(mockApi.recordConsent).toHaveBeenCalledWith({
+      docVersion: '2026-07-23',
+      pdn: true,
+      psych: true,
+      age18: true,
+    });
 
     // result: submitted via the mocked api and rendered
     await waitFor(() => expect(mockApi.submit).toHaveBeenCalledTimes(1));

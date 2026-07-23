@@ -3,9 +3,10 @@ import type { Db } from './db/connection.js';
 import { usersRepo } from './db/users.repo.js';
 import { runsRepo } from './db/runs.repo.js';
 import { signalsRepo, isSignalEvent } from './db/signals.repo.js';
+import { consentsRepo } from './db/consents.repo.js';
 import { verifyInitData, InitDataError } from './auth/init-data.js';
 import { issueSession, verifySession, SessionError } from './auth/session.js';
-import { SubmitPayloadSchema, AREAS } from '@stasis/shared';
+import { SubmitPayloadSchema, ConsentPayloadSchema, AREAS } from '@stasis/shared';
 import { computeProfile } from './engine/index.js';
 import { renderResult } from './engine/render.js';
 import type { ContentBundle } from './content/loader.js';
@@ -25,6 +26,7 @@ export function buildApp(deps: { db: Db; botToken: string; jwtSecret: string; en
   const users = usersRepo(deps.db);
   const runs = runsRepo(deps.db, deps.encKey);
   const signals = signalsRepo(deps.db);
+  const consents = consentsRepo(deps.db);
 
   app.post('/auth', async (req, reply) => {
     const header = req.headers.authorization ?? '';
@@ -93,6 +95,20 @@ export function buildApp(deps: { db: Db; botToken: string; jwtSecret: string; en
     const body = (req.body ?? {}) as { event?: unknown; meta?: unknown };
     if (!isSignalEvent(body.event)) return reply.code(400).send({ error: 'invalid_event' });
     signals.record(userId, body.event, body.meta);
+    return { ok: true };
+  });
+
+  app.post('/consent', async (req, reply) => {
+    let userId: number;
+    try {
+      userId = readSession(req, deps.jwtSecret).userId;
+    } catch (e) {
+      if (e instanceof SessionError) return reply.code(401).send({ error: 'invalid_session' });
+      throw e;
+    }
+    const parsed = ConsentPayloadSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'invalid_payload' });
+    consents.record(userId, parsed.data.docVersion);
     return { ok: true };
   });
 

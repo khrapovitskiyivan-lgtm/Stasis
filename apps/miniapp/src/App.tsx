@@ -12,6 +12,7 @@ import { StrategyScreen } from './screens/StrategyScreen.js';
 import { ResultScreen } from './screens/ResultScreen.js';
 
 const BASE_URL = ((import.meta as any).env?.VITE_API_BASE as string | undefined) ?? '';
+const CONSENT_DOC_VERSION = '2026-07-23';
 
 export function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -25,6 +26,8 @@ export function App() {
   // Guards the submit to exactly one in-flight attempt; a failure requires an
   // explicit user retry (bumps retryNonce) rather than auto-looping the effect.
   const submitAttempted = useRef(false);
+  // Guards the consent recording call to fire at most once per session.
+  const consentRecorded = useRef(false);
 
   const [state, dispatch] = useReducer(flowReducer, initialFlow);
 
@@ -48,6 +51,24 @@ export function App() {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
+
+  // Audit trail (compliance): once the user gives consent, record it
+  // server-side. Fire-and-forget with respect to the UI — the flow gate is
+  // the legal-copy-level checkboxes in <Consent>, not this call, so a
+  // failure here does not block or roll back navigation.
+  useEffect(() => {
+    if (!state.consentGiven || !api || consentRecorded.current) return;
+    consentRecorded.current = true;
+    api
+      .authed()
+      .then(() =>
+        api.recordConsent({ docVersion: CONSENT_DOC_VERSION, pdn: true, psych: true, age18: true })
+      )
+      .catch(() => {
+        // Best-effort from the UI's perspective: recording can be retried
+        // later. Nothing to surface here today (per brief).
+      });
+  }, [state.consentGiven, api]);
 
   // Simplification (Task 7): the pre-typology mini-insight is server-authored
   // IP with no dedicated fast-path endpoint yet. Skip straight through so the

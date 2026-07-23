@@ -27,6 +27,14 @@ export const SubmitPayloadSchema = z.object({
 });
 export type SubmitPayload = z.infer<typeof SubmitPayloadSchema>;
 
+export const ConsentPayloadSchema = z.object({
+  docVersion: z.string().min(1),
+  pdn: z.literal(true),
+  psych: z.literal(true),
+  age18: z.literal(true),
+});
+export type ConsentPayload = z.infer<typeof ConsentPayloadSchema>;
+
 export const RecommendationSchema = z.object({
   trigger: z.string().min(1),
   action: z.string().min(1),

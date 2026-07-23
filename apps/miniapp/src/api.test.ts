@@ -152,4 +152,34 @@ describe('createApi', () => {
     const api = createApi('https://api.test', 'raw');
     await expect(api.signal('viewed_result', { foo: 'bar' })).resolves.toBeUndefined();
   });
+
+  it('recordConsent() authenticates first and POSTs /consent with Bearer token and payload', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ token: 'tok123' }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true }));
+
+    const api = createApi('https://api.test', 'raw');
+    const payload = { docVersion: '2026-07-23', pdn: true as const, psych: true as const, age18: true as const };
+    await api.recordConsent(payload);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [authUrl] = fetchMock.mock.calls[0];
+    const [consentUrl, consentInit] = fetchMock.mock.calls[1];
+    expect(authUrl).toBe('https://api.test/auth');
+    expect(consentUrl).toBe('https://api.test/consent');
+    expect(consentInit.method).toBe('POST');
+    expect(consentInit.headers.authorization).toBe('Bearer tok123');
+    expect(JSON.parse(consentInit.body)).toEqual(payload);
+  });
+
+  it('recordConsent() throws ApiError on non-ok response (unlike best-effort signal)', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ token: 'tok123' }))
+      .mockResolvedValueOnce(jsonResponse({ error: 'invalid_payload' }, 400));
+
+    const api = createApi('https://api.test', 'raw');
+    await expect(
+      api.recordConsent({ docVersion: '2026-07-23', pdn: true, psych: true, age18: true })
+    ).rejects.toBeInstanceOf(ApiError);
+  });
 });

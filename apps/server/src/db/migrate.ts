@@ -40,4 +40,9 @@ export function runMigrations(db: Db): void {
       created_at INTEGER NOT NULL
     );
   `);
+  db.exec(`CREATE TABLE IF NOT EXISTS consents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    kind TEXT NOT NULL, doc_version TEXT NOT NULL, granted_at INTEGER NOT NULL
+  );`);
 }

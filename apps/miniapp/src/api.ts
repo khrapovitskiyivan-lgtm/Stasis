@@ -1,4 +1,4 @@
-import { RenderedResultSchema, type Area, type RenderedResult, type SubmitPayload } from '@stasis/shared';
+import { RenderedResultSchema, type Area, type ConsentPayload, type RenderedResult, type SubmitPayload } from '@stasis/shared';
 
 export class ApiError extends Error {
   constructor(
@@ -21,6 +21,7 @@ export interface Api {
   getAssessment(): Promise<Assessment>;
   submit(payload: SubmitPayload): Promise<{ profileId: number; result: RenderedResult }>;
   signal(event: string, meta?: unknown): Promise<void>;
+  recordConsent(payload: ConsentPayload): Promise<void>;
 }
 
 export function createApi(baseUrl: string, initDataRaw: string): Api {
@@ -77,5 +78,20 @@ export function createApi(baseUrl: string, initDataRaw: string): Api {
     }
   }
 
-  return { authed, getAssessment, submit, signal };
+  // Unlike signal() this is not best-effort: consent recording is the audit
+  // trail for a compliance requirement, so failures must surface to the caller.
+  async function recordConsent(payload: ConsentPayload): Promise<void> {
+    await authed();
+    const res = await fetch(`${baseUrl}/consent`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${token}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new ApiError(res.status, 'consent recording failed');
+  }
+
+  return { authed, getAssessment, submit, signal, recordConsent };
 }
