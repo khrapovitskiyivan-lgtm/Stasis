@@ -12,12 +12,12 @@
 
 - Node.js ≥ 20 LTS; TypeScript `strict: true`; ESM modules (`"type": "module"`).
 - Package manager: **pnpm** (workspaces). No npm/yarn lockfiles.
-- SQLite via `better-sqlite3` with `PRAGMA journal_mode=WAL` and `PRAGMA busy_timeout=5000`.
+- SQLite via Node's built-in `node:sqlite` (`DatabaseSync`) with `PRAGMA journal_mode=WAL` and `PRAGMA busy_timeout=5000`. No native build / node-gyp / Visual Studio required.
 - All request/response bodies validated by zod schemas from `packages/shared` — never trust client-computed values (profile, scores are recomputed server-side in Phase 2).
 - `initData` validated on every protected request; `auth_date` older than **3 hours** is rejected.
 - Secrets only from environment (`BOT_TOKEN`, `JWT_SECRET`); never committed. `.env` is git-ignored.
 - Sensitive raw data (test answers, wheel scores) is encrypted at rest in later phases; Phase 1 stores only `users` (no sensitive psychological data yet).
-- Windows note: `better-sqlite3` is a native module — `pnpm install` must succeed with build tools present (VS Build Tools / `windows-build-tools`). If native build fails, that is an environment fix, not a code change.
+- `node:sqlite` is built into Node ≥22.5 (present on Node 24) — no external SQLite dependency, no compilation. Stable in Node 24 (no runtime flag, no experimental warning). This replaces `better-sqlite3`, whose native build fails on this machine's toolchain.
 - Tests: **vitest**. Every task ends green before commit.
 
 ---
@@ -124,8 +124,9 @@ git commit -m "chore: monorepo scaffold with pnpm workspaces"
   - `ELEMENTS = ['fire','water','air','earth'] as const`
   - `WheelScoresSchema` → `Record<Area, 1..10>`
   - `LikertAnswerSchema` → `{ itemId: string; value: 1..6 }`
-  - `SubmitPayloadSchema` → `{ wheel: WheelScores; elementAnswers: LikertAnswer[]; resourceAnswers: LikertAnswer[] }`
-  - Types: `Area`, `Element`, `WheelScores`, `LikertAnswer`, `SubmitPayload`.
+  - `STRATEGIES = ['power','attention','superiority','avoidance'] as const`
+  - `SubmitPayloadSchema` → `{ wheel: WheelScores; elementAnswers: LikertAnswer[]; strategyAnswers: LikertAnswer[]; resourceAnswers: LikertAnswer[] }`
+  - Types: `Area`, `Element`, `Strategy`, `WheelScores`, `LikertAnswer`, `SubmitPayload`.
 
 - [ ] **Step 1: Create `packages/shared/package.json`**
 
@@ -173,6 +174,7 @@ describe('SubmitPayloadSchema', () => {
     const p = {
       wheel: { health: 3, family: 7, rest: 5, friends: 4, career: 3, hobby: 6 },
       elementAnswers: [{ itemId: 'e1', value: 6 }],
+      strategyAnswers: [{ itemId: 's1', value: 4 }],
       resourceAnswers: [{ itemId: 'r1', value: 2 }],
     };
     expect(SubmitPayloadSchema.parse(p)).toEqual(p);
@@ -181,6 +183,7 @@ describe('SubmitPayloadSchema', () => {
     expect(() => SubmitPayloadSchema.parse({
       wheel: { health: 3, family: 7, rest: 5, friends: 4, career: 3, hobby: 6 },
       elementAnswers: [{ itemId: 'e1', value: 7 }],
+      strategyAnswers: [],
       resourceAnswers: [],
     })).toThrow();
   });
@@ -199,8 +202,10 @@ import { z } from 'zod';
 
 export const AREAS = ['health', 'family', 'rest', 'friends', 'career', 'hobby'] as const;
 export const ELEMENTS = ['fire', 'water', 'air', 'earth'] as const;
+export const STRATEGIES = ['power', 'attention', 'superiority', 'avoidance'] as const;
 export type Area = (typeof AREAS)[number];
 export type Element = (typeof ELEMENTS)[number];
+export type Strategy = (typeof STRATEGIES)[number];
 
 const score1to10 = z.number().int().min(1).max(10);
 export const WheelScoresSchema = z.object(
@@ -217,6 +222,7 @@ export type LikertAnswer = z.infer<typeof LikertAnswerSchema>;
 export const SubmitPayloadSchema = z.object({
   wheel: WheelScoresSchema,
   elementAnswers: z.array(LikertAnswerSchema),
+  strategyAnswers: z.array(LikertAnswerSchema),
   resourceAnswers: z.array(LikertAnswerSchema),
 });
 export type SubmitPayload = z.infer<typeof SubmitPayloadSchema>;
@@ -255,7 +261,7 @@ git commit -m "feat(shared): wheel and likert zod schemas as client-server contr
 **Interfaces:**
 - Consumes: nothing from other tasks.
 - Produces:
-  - `openDb(path: string): Database` — better-sqlite3 handle with WAL + busy_timeout, migrations applied.
+  - `openDb(path: string): Db` — `node:sqlite` `DatabaseSync` handle with WAL + busy_timeout, migrations applied.
   - `usersRepo(db)` → `{ upsertByTgId(tgUserId: number, username?: string, lang?: string): { id: number; tgUserId: number }; getByTgId(tgUserId: number): UserRow | undefined }`.
   - `UserRow = { id: number; tgUserId: number; username: string | null; lang: string | null; createdAt: number; deletedAt: number | null }`.
 
@@ -274,7 +280,6 @@ git commit -m "feat(shared): wheel and likert zod schemas as client-server contr
   },
   "dependencies": {
     "@stasis/shared": "workspace:*",
-    "better-sqlite3": "^11.0.0",
     "fastify": "^4.28.0",
     "jsonwebtoken": "^9.0.2",
     "@telegram-apps/init-data-node": "^1.1.0",
@@ -284,9 +289,8 @@ git commit -m "feat(shared): wheel and likert zod schemas as client-server contr
     "typescript": "^5.5.0",
     "vitest": "^2.0.0",
     "tsx": "^4.16.0",
-    "@types/better-sqlite3": "^7.6.0",
     "@types/jsonwebtoken": "^9.0.0",
-    "@types/node": "^20.14.0"
+    "@types/node": "^24.0.0"
   }
 }
 ```
@@ -331,20 +335,32 @@ Expected: FAIL — cannot resolve `./connection.js`.
 - [ ] **Step 5: Implement `apps/server/src/db/connection.ts`**
 
 ```ts
-import Database from 'better-sqlite3';
+import { createRequire } from 'node:module';
 import { runMigrations } from './migrate.js';
 
-export type Db = Database.Database;
+// node:sqlite is a builtin only under its prefixed name. Vitest's Vite
+// pipeline strips the "node:" prefix and then fails to resolve bare
+// "sqlite". Loading it via createRequire at runtime bypasses Vite's static
+// resolution entirely (Vite only sees "node:module", a classic builtin it
+// handles). In plain Node this is just a normal builtin require.
+const nodeRequire = createRequire(import.meta.url);
+const { DatabaseSync } = nodeRequire('node:sqlite') as typeof import('node:sqlite');
+
+export type Db = InstanceType<typeof DatabaseSync>;
 
 export function openDb(path: string): Db {
-  const db = new Database(path);
-  db.pragma('journal_mode = WAL');
-  db.pragma('busy_timeout = 5000');
-  db.pragma('foreign_keys = ON');
+  const db = new DatabaseSync(path);
+  db.exec('PRAGMA journal_mode = WAL');
+  db.exec('PRAGMA busy_timeout = 5000');
+  db.exec('PRAGMA foreign_keys = ON');
   runMigrations(db);
   return db;
 }
 ```
+
+Notes:
+- **Do NOT `import { DatabaseSync } from 'node:sqlite'` directly** — that static import breaks under Vitest/Vite (Vite strips `node:` and cannot resolve bare `sqlite`, since `sqlite` is a builtin only under its prefixed name). The `createRequire` form above is required and needs no vitest config.
+- `migrate.ts` and `users.repo.ts` below are unchanged — they use `db.exec(...)` and `db.prepare(...).run/get(...)`, which `DatabaseSync` supports with the same shapes (`run` → `{ changes, lastInsertRowid }`, `get` → row object | undefined). Type imports of `Db` resolve to `InstanceType<typeof DatabaseSync>`.
 
 - [ ] **Step 6: Implement `apps/server/src/db/migrate.ts`**
 
@@ -382,7 +398,9 @@ export interface UserRow {
 export function usersRepo(db: Db) {
   const insert = db.prepare(
     `INSERT INTO users (tg_user_id, username, lang, created_at) VALUES (?, ?, ?, ?)
-     ON CONFLICT(tg_user_id) DO UPDATE SET username = excluded.username, lang = excluded.lang`
+     ON CONFLICT(tg_user_id) DO UPDATE SET
+       username = COALESCE(excluded.username, users.username),
+       lang = COALESCE(excluded.lang, users.lang)`
   );
   const select = db.prepare(`SELECT * FROM users WHERE tg_user_id = ?`);
   const map = (r: any): UserRow | undefined =>
