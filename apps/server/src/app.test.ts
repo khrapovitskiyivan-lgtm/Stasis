@@ -2,9 +2,15 @@ import { describe, it, expect } from 'vitest';
 import { sign } from '@telegram-apps/init-data-node';
 import { openDb } from './db/connection.js';
 import { buildApp } from './app.js';
+import { loadContent } from './content/loader.js';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 
 const BOT = '123456:TESTTOKEN';
 const SECRET = 'test-secret';
+const ENC = 'a'.repeat(64);
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+const content = loadContent(ROOT);
 
 function freshInitData(): string {
   const now = new Date();
@@ -21,7 +27,7 @@ function freshInitData(): string {
 
 describe('app', () => {
   it('POST /auth returns a token, then GET /me resolves the user', async () => {
-    const app = buildApp({ db: openDb(':memory:'), botToken: BOT, jwtSecret: SECRET });
+    const app = buildApp({ db: openDb(':memory:'), botToken: BOT, jwtSecret: SECRET, encKey: ENC, content });
 
     const auth = await app.inject({
       method: 'POST', url: '/auth',
@@ -37,13 +43,13 @@ describe('app', () => {
   });
 
   it('POST /auth rejects a bad initData with 401', async () => {
-    const app = buildApp({ db: openDb(':memory:'), botToken: BOT, jwtSecret: SECRET });
+    const app = buildApp({ db: openDb(':memory:'), botToken: BOT, jwtSecret: SECRET, encKey: ENC, content });
     const res = await app.inject({ method: 'POST', url: '/auth', headers: { authorization: 'tma garbage' } });
     expect(res.statusCode).toBe(401);
   });
 
   it('GET /me rejects a bad token with 401', async () => {
-    const app = buildApp({ db: openDb(':memory:'), botToken: BOT, jwtSecret: SECRET });
+    const app = buildApp({ db: openDb(':memory:'), botToken: BOT, jwtSecret: SECRET, encKey: ENC, content });
     const res = await app.inject({ method: 'GET', url: '/me', headers: { authorization: 'Bearer nope' } });
     expect(res.statusCode).toBe(401);
   });

@@ -6,6 +6,12 @@ Reference spec: `docs/superpowers/specs/2026-07-22-stasis-solo-mvp-design.md`.
 
 ---
 
+## 2026-07-23 — Persistence + `POST /submit` (Phase 2, Task 6)
+
+- **`ENGINE_VERSION = '2.0.0'` introduced** as a literal constant in `apps/server/src/db/runs.repo.ts`, stamped onto every `profiles` row alongside `content_version`. Not previously named in the spec; recorded here per the brief's own drift note. No other behavior drift: crypto (AES-256-GCM, `iv:tag:ciphertext` hex encoding), the `test_runs`/`profiles` schema, `runsRepo.saveRun`, and the `/submit` contract (`200 {profileId, result}` / `400` bad body / `401` bad session) all match the brief's code as written.
+- **`app.submit.test.ts`'s `sign(...)` fixture needed `signature: 'test-signature'`**, which the brief's Step 7 snippet omitted (it only set `auth_date`). Without it, `parse()` (inside `verifyInitData`) throws on a validly-HMAC-signed initData that's missing the `signature` field — the same gotcha already documented in Phase 1's `app.test.ts`. Adapted the submit test's fixture to match the established camelCase-`user`/top-level-`signature` pattern; no production code changed.
+- **`runs.repo.ts`'s `saveRun` typed `profile` as `ReturnType<typeof computeProfile>`** instead of the brief's `profile: any`, to keep the file strict-mode-clean without an explicit `any`. Same field access, same behavior.
+
 ## 2026-07-23 — Content loader (Phase 2, Task 3)
 
 - **`content/matrix/strategies.yaml`: 32 `howTo` bullets wrapped in double quotes.** Each `interactionGuides[].howTo` entry using the `Заголовок: пояснение` lead-in style contained an unquoted `: ` (colon+space) inside a plain YAML scalar, which is invalid per the YAML block-scalar grammar — `js-yaml` (and any spec-compliant parser) parses it as a single-key mapping (`{ "Заголовок": "пояснение" }`) instead of the intended string, failing `InteractionGuideSchema`'s `howTo: z.array(z.string())`. Fixed by quoting the 32 affected lines (text content unchanged, byte-identical apart from the added `"..."`); the 16 bullets with no internal colon were already valid and untouched. Caught by `apps/server/src/content/loader.test.ts` loading the real bundle.
