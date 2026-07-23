@@ -53,4 +53,15 @@ export function runMigrations(db: Db): void {
     created_at INTEGER NOT NULL,
     revoked_at INTEGER
   );`);
+  db.exec(`CREATE TABLE IF NOT EXISTS follow_ups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    card_ref TEXT NOT NULL,
+    step_text TEXT NOT NULL,
+    due_at INTEGER NOT NULL,
+    sent_at INTEGER,
+    response TEXT,
+    unsubscribed INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  );`);
 }

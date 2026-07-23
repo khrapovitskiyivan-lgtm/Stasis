@@ -7,6 +7,7 @@ import { signalsRepo, isSignalEvent } from './db/signals.repo.js';
 import { consentsRepo } from './db/consents.repo.js';
 import { sharesRepo } from './db/shares.repo.js';
 import { profilesRepo } from './db/profiles.repo.js';
+import { followUpsRepo } from './db/followups.repo.js';
 import { verifyInitData, InitDataError } from './auth/init-data.js';
 import { issueSession, verifySession, SessionError } from './auth/session.js';
 import { SubmitPayloadSchema, ConsentPayloadSchema, SharePublicPayloadSchema, AREAS } from '@stasis/shared';
@@ -44,6 +45,8 @@ export function buildApp(deps: {
   const consents = consentsRepo(deps.db);
   const shares = sharesRepo(deps.db);
   const profiles = profilesRepo(deps.db);
+  const followUps = followUpsRepo(deps.db, deps.encKey);
+  const FOLLOWUP_DELAY_MS = 3 * 24 * 3600 * 1000;
   // Per-slug OG image cache: the share payload is immutable once created, so
   // a rendered PNG never goes stale. Lives for the process lifetime of this
   // app instance (MVP-scale; a later optimization could move this to disk/CDN).
@@ -186,6 +189,37 @@ export function buildApp(deps: {
     const png = svgToPng(renderOgSvg(parsed.data));
     ogImageCache.set(slug, png);
     return reply.type('image/png').send(png);
+  });
+
+  app.post('/followup', async (req, reply) => {
+    let userId: number;
+    try {
+      userId = readSession(req, deps.jwtSecret).userId;
+    } catch (e) {
+      if (e instanceof SessionError) return reply.code(401).send({ error: 'invalid_session' });
+      throw e;
+    }
+    if (!users.getById(userId)) return reply.code(401).send({ error: 'invalid_session' });
+    const body = (req.body ?? {}) as { cardRef?: unknown; stepText?: unknown };
+    if (typeof body.cardRef !== 'string' || body.cardRef.length === 0 ||
+        typeof body.stepText !== 'string' || body.stepText.length === 0) {
+      return reply.code(400).send({ error: 'invalid_payload' });
+    }
+    followUps.schedule(userId, body.cardRef, body.stepText, Date.now() + FOLLOWUP_DELAY_MS);
+    return { ok: true };
+  });
+
+  app.post('/followup/unsubscribe', async (req, reply) => {
+    let userId: number;
+    try {
+      userId = readSession(req, deps.jwtSecret).userId;
+    } catch (e) {
+      if (e instanceof SessionError) return reply.code(401).send({ error: 'invalid_session' });
+      throw e;
+    }
+    if (!users.getById(userId)) return reply.code(401).send({ error: 'invalid_session' });
+    followUps.unsubscribe(userId);
+    return { ok: true };
   });
 
   return app;

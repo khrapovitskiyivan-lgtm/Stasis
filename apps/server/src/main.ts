@@ -3,6 +3,7 @@ import { openDb } from './db/connection.js';
 import { buildApp } from './app.js';
 import { loadContent } from './content/loader.js';
 import { buildBot } from './bot/bot.js';
+import { startScheduler } from './followup/scheduler.js';
 
 const cfg = loadConfig();
 const content = loadContent(process.cwd());
@@ -10,6 +11,9 @@ const db = openDb(cfg.dbPath);
 
 // Bot side is optional: only wire it up once a token and Mini App URL exist.
 const bot = cfg.botToken && cfg.miniappUrl ? buildBot({ botToken: cfg.botToken, miniappUrl: cfg.miniappUrl, db }) : undefined;
+
+// Follow-up nudges only make sense once the bot can actually message users.
+if (bot) startScheduler(db, cfg.encKey, bot);
 
 const app = buildApp({
   db,
