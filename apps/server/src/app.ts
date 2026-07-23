@@ -29,10 +29,10 @@ export function buildApp(deps: { db: Db; botToken: string; jwtSecret: string }):
     const token = header.startsWith('Bearer ') ? header.slice(7) : '';
     try {
       const { userId } = verifySession(token, deps.jwtSecret);
-      const row = deps.db.prepare('SELECT tg_user_id FROM users WHERE id = ?').get(userId) as
-        | { tg_user_id: number }
-        | undefined;
-      return { userId, tgUserId: row?.tg_user_id ?? null };
+      const user = users.getById(userId);
+      // Valid token but no live user row (deleted/orphaned) → reject, don't 200.
+      if (!user) return reply.code(401).send({ error: 'invalid_session' });
+      return { userId: user.id, tgUserId: user.tgUserId };
     } catch (e) {
       if (e instanceof SessionError) return reply.code(401).send({ error: 'invalid_session' });
       throw e;

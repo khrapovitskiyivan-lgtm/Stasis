@@ -24,6 +24,14 @@ describe('usersRepo', () => {
     expect(row?.lang).toBe('ru');
   });
 
+  it('getById returns the mapped row and undefined for unknown id', () => {
+    const db = openDb(':memory:');
+    const repo = usersRepo(db);
+    const { id } = repo.upsertByTgId(4242, 'ivan', 'ru');
+    expect(repo.getById(id)?.tgUserId).toBe(4242);
+    expect(repo.getById(999999)).toBeUndefined();
+  });
+
   it('returns undefined for unknown user', () => {
     const db = openDb(':memory:');
     expect(usersRepo(db).getByTgId(999)).toBeUndefined();
