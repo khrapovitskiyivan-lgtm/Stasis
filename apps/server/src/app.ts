@@ -106,6 +106,8 @@ export function buildApp(deps: { db: Db; botToken: string; jwtSecret: string; en
       if (e instanceof SessionError) return reply.code(401).send({ error: 'invalid_session' });
       throw e;
     }
+    // Parity with /submit and /signal: a valid token for a gone/soft-deleted user must not write.
+    if (!users.getById(userId)) return reply.code(401).send({ error: 'invalid_session' });
     const parsed = ConsentPayloadSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'invalid_payload' });
     consents.record(userId, parsed.data.docVersion);
