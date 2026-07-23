@@ -23,9 +23,13 @@ export function computeProfile(
     .filter((a) => content.matrix[el.lead]?.[a])
     .map((a) => ({ element: el.lead, area: a }));
   const guideRefs = STRATEGIES.map((other) => ({ you: st.lead, other }));
+  // Mirrors computeMiniInsight's fallback: weakAreas() can be empty (all spheres > 4).
+  // weakArea (singular) always resolves to a real Area so sphere-insight lookups never
+  // index with undefined; weakAreas (plural, capped at 3) stays as-is for belief cards.
+  const weakArea = weak[0] ?? lowestArea(wheel);
   return {
     leadElement: el.lead, secondElement: el.second, isMixed: el.isMixed,
-    weakAreas: weak, resourceState: state, beliefCardIds,
+    weakAreas: weak, weakArea, resourceState: state, beliefCardIds,
     leadStrategy: st.lead, secondStrategy: st.second, isStrategyMixed: st.isMixed, guideRefs,
   };
 }

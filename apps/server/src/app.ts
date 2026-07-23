@@ -2,10 +2,12 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import type { Db } from './db/connection.js';
 import { usersRepo } from './db/users.repo.js';
 import { runsRepo } from './db/runs.repo.js';
+import { signalsRepo, isSignalEvent } from './db/signals.repo.js';
 import { verifyInitData, InitDataError } from './auth/init-data.js';
 import { issueSession, verifySession, SessionError } from './auth/session.js';
-import { SubmitPayloadSchema } from '@stasis/shared';
+import { SubmitPayloadSchema, AREAS } from '@stasis/shared';
 import { computeProfile } from './engine/index.js';
+import { renderResult } from './engine/render.js';
 import type { ContentBundle } from './content/loader.js';
 
 const AUTH_MAX_AGE_SEC = 3 * 3600;
@@ -22,6 +24,7 @@ export function buildApp(deps: { db: Db; botToken: string; jwtSecret: string; en
   const app = Fastify({ logger: false });
   const users = usersRepo(deps.db);
   const runs = runsRepo(deps.db, deps.encKey);
+  const signals = signalsRepo(deps.db);
 
   app.post('/auth', async (req, reply) => {
     const header = req.headers.authorization ?? '';
@@ -34,6 +37,18 @@ export function buildApp(deps: { db: Db; botToken: string; jwtSecret: string; en
       if (e instanceof InitDataError) return reply.code(401).send({ error: 'invalid_init_data' });
       throw e;
     }
+  });
+
+  // Public: question text is not sensitive. The belief matrix, strategy
+  // profiles, and interaction guides (the IP) never leave the server until
+  // /submit renders a result — only bare id+statement(+situation) ship here.
+  app.get('/assessment', async () => {
+    return {
+      wheelAreas: AREAS,
+      elementItems: deps.content.elementItems.map((i) => ({ id: i.id, statement: i.statement })),
+      strategyItems: deps.content.strategyTest.items.map((i) => ({ id: i.id, situation: i.situation, statement: i.statement })),
+      resourceItems: deps.content.resourceItems.map((i) => ({ id: i.id, statement: i.statement })),
+    };
   });
 
   app.get('/me', async (req, reply) => {
@@ -63,7 +78,22 @@ export function buildApp(deps: { db: Db; botToken: string; jwtSecret: string; en
     if (!parsed.success) return reply.code(400).send({ error: 'invalid_payload' });
     const profile = computeProfile(parsed.data.elementAnswers, parsed.data.strategyAnswers, parsed.data.wheel, parsed.data.resourceAnswers, deps.content);
     const { profileId } = runs.saveRun(userId, parsed.data, profile, deps.content.version);
-    return { profileId, result: profile };
+    return { profileId, result: renderResult(profile, deps.content) };
+  });
+
+  app.post('/signal', async (req, reply) => {
+    let userId: number;
+    try {
+      userId = readSession(req, deps.jwtSecret).userId;
+    } catch (e) {
+      if (e instanceof SessionError) return reply.code(401).send({ error: 'invalid_session' });
+      throw e;
+    }
+    if (!users.getById(userId)) return reply.code(401).send({ error: 'invalid_session' });
+    const body = (req.body ?? {}) as { event?: unknown; meta?: unknown };
+    if (!isSignalEvent(body.event)) return reply.code(400).send({ error: 'invalid_event' });
+    signals.record(userId, body.event, body.meta);
+    return { ok: true };
   });
 
   return app;
