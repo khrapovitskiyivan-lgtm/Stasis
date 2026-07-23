@@ -16,6 +16,13 @@ describe('computeMiniInsight', () => {
     expect(r.sphereInsightId).toBe('career');
     expect(r.resourceState).toBe('ok');
   });
+
+  it('falls back to the lowest sphere when none score <=4 (no crash)', () => {
+    const allHigh = { health: 9, family: 8, rest: 7, friends: 9, career: 6, hobby: 7 };
+    const r = computeMiniInsight(allHigh, res, content);
+    expect(r.weakArea).toBe('career'); // lowest at 6, still a valid Area
+    expect(content.sphereInsights[r.weakArea]).toBeDefined();
+  });
 });
 
 describe('computeProfile', () => {
@@ -27,7 +34,8 @@ describe('computeProfile', () => {
     expect(p.leadStrategy).toBe('avoidance');
     expect(p.guideRefs).toHaveLength(4);
     expect(p.guideRefs.every((g) => g.you === 'avoidance')).toBe(true);
-    // career weak + fire lead -> if matrix has fire.career, it's referenced
-    if (content.matrix.fire.career) expect(p.beliefCardIds).toContainEqual({ element: 'fire', area: 'career' });
+    // weak areas are career(2) and health(3); the flagship matrix has fire.career
+    // but NOT fire.health, so only the present card is referenced (exclusion pinned).
+    expect(p.beliefCardIds).toEqual([{ element: 'fire', area: 'career' }]);
   });
 });

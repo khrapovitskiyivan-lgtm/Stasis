@@ -1,5 +1,5 @@
-import { STRATEGIES, type Area, type Strategy, type LikertAnswer, type WheelScores } from '@stasis/shared';
-import type { ContentBundle, ResourceItem } from '../content/loader.js';
+import { STRATEGIES, type Area, type LikertAnswer, type WheelScores } from '@stasis/shared';
+import type { ContentBundle } from '../content/loader.js';
 import { scoreElements, scoreStrategies, scoreResource, weakAreas } from './scoring.js';
 
 export function computeMiniInsight(wheel: WheelScores, resourceAnswers: LikertAnswer[], content: ContentBundle) {
@@ -18,10 +18,10 @@ export function computeProfile(
   const st = scoreStrategies(strategyAnswers, content.strategyTest.items);
   const { state } = scoreResource(resourceAnswers, content.resourceItems);
   const weak = weakAreas(wheel);
+  // weak is already capped at 3 by weakAreas(); filtering to matrix-present cards can only shrink it.
   const beliefCardIds = weak
     .filter((a) => content.matrix[el.lead]?.[a])
-    .map((a) => ({ element: el.lead, area: a }))
-    .slice(0, 3);
+    .map((a) => ({ element: el.lead, area: a }));
   const guideRefs = STRATEGIES.map((other) => ({ you: st.lead, other }));
   return {
     leadElement: el.lead, secondElement: el.second, isMixed: el.isMixed,
