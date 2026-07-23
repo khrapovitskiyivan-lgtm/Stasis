@@ -27,6 +27,14 @@ export const SubmitPayloadSchema = z.object({
 });
 export type SubmitPayload = z.infer<typeof SubmitPayloadSchema>;
 
+export const ConsentPayloadSchema = z.object({
+  docVersion: z.string().min(1),
+  pdn: z.literal(true),
+  psych: z.literal(true),
+  age18: z.literal(true),
+});
+export type ConsentPayload = z.infer<typeof ConsentPayloadSchema>;
+
 export const RecommendationSchema = z.object({
   trigger: z.string().min(1),
   action: z.string().min(1),
@@ -84,3 +92,13 @@ export const RenderedResultSchema = z.object({
   strategy: z.object({ lead: StrategyProfileSchema, guides: z.array(InteractionGuideSchema) }),
 });
 export type RenderedResult = z.infer<typeof RenderedResultSchema>;
+
+// Public share payload: witness-copy only. Deliberately excludes scores,
+// spheres, answers, and belief/matrix text — this is the only shape that
+// ever reaches an unauthenticated /share/:slug response.
+export const SharePublicPayloadSchema = z.object({
+  leadElement: elementEnum,
+  headline: z.string().min(1),
+  blurb: z.string().min(1),
+});
+export type SharePublicPayload = z.infer<typeof SharePublicPayloadSchema>;

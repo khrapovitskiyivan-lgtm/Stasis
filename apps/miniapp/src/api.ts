@@ -1,4 +1,4 @@
-import { RenderedResultSchema, type Area, type RenderedResult, type SubmitPayload } from '@stasis/shared';
+import { RenderedResultSchema, type Area, type ConsentPayload, type RenderedResult, type SubmitPayload } from '@stasis/shared';
 
 export class ApiError extends Error {
   constructor(
@@ -21,6 +21,9 @@ export interface Api {
   getAssessment(): Promise<Assessment>;
   submit(payload: SubmitPayload): Promise<{ profileId: number; result: RenderedResult }>;
   signal(event: string, meta?: unknown): Promise<void>;
+  recordConsent(payload: ConsentPayload): Promise<void>;
+  createShare(profileId: number): Promise<{ slug: string; url: string }>;
+  takeStep(cardRef: string, stepText: string): Promise<void>;
 }
 
 export function createApi(baseUrl: string, initDataRaw: string): Api {
@@ -77,5 +80,50 @@ export function createApi(baseUrl: string, initDataRaw: string): Api {
     }
   }
 
-  return { authed, getAssessment, submit, signal };
+  // Unlike signal() this is not best-effort: consent recording is the audit
+  // trail for a compliance requirement, so failures must surface to the caller.
+  async function recordConsent(payload: ConsentPayload): Promise<void> {
+    await authed();
+    const res = await fetch(`${baseUrl}/consent`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${token}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new ApiError(res.status, 'consent recording failed');
+  }
+
+  // Not best-effort: a failed share-link creation must surface so the caller
+  // can fall back / retry rather than silently sharing nothing.
+  async function createShare(profileId: number): Promise<{ slug: string; url: string }> {
+    await authed();
+    const res = await fetch(`${baseUrl}/share`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${token}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ profileId }),
+    });
+    if (!res.ok) throw new ApiError(res.status, 'share creation failed');
+    return (await res.json()) as { slug: string; url: string };
+  }
+
+  // Not best-effort: the caller needs to know if scheduling the follow-up failed.
+  async function takeStep(cardRef: string, stepText: string): Promise<void> {
+    await authed();
+    const res = await fetch(`${baseUrl}/followup`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${token}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ cardRef, stepText }),
+    });
+    if (!res.ok) throw new ApiError(res.status, 'take-step failed');
+  }
+
+  return { authed, getAssessment, submit, signal, recordConsent, createShare, takeStep };
 }

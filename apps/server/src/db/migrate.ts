@@ -8,7 +8,8 @@ export function runMigrations(db: Db): void {
       username    TEXT,
       lang        TEXT,
       created_at  INTEGER NOT NULL,
-      deleted_at  INTEGER
+      deleted_at  INTEGER,
+      followups_opt_out INTEGER NOT NULL DEFAULT 0
     );
   `);
   db.exec(`
@@ -40,4 +41,28 @@ export function runMigrations(db: Db): void {
       created_at INTEGER NOT NULL
     );
   `);
+  db.exec(`CREATE TABLE IF NOT EXISTS consents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    kind TEXT NOT NULL, doc_version TEXT NOT NULL, granted_at INTEGER NOT NULL
+  );`);
+  db.exec(`CREATE TABLE IF NOT EXISTS shares (
+    slug TEXT PRIMARY KEY,
+    profile_id INTEGER NOT NULL REFERENCES profiles(id),
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    public_payload TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    revoked_at INTEGER
+  );`);
+  db.exec(`CREATE TABLE IF NOT EXISTS follow_ups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    card_ref TEXT NOT NULL,
+    step_text TEXT NOT NULL,
+    due_at INTEGER NOT NULL,
+    sent_at INTEGER,
+    response TEXT,
+    unsubscribed INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  );`);
 }

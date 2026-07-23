@@ -5,9 +5,10 @@ import { Likert, type LikertValue } from './Likert.js';
 export interface BeliefCardProps {
   card: BeliefCardData;
   onNotMe: (card: BeliefCardData) => void;
+  onTakeStep: (card: BeliefCardData) => void;
 }
 
-export function BeliefCard({ card, onNotMe }: BeliefCardProps) {
+export function BeliefCard({ card, onNotMe, onTakeStep }: BeliefCardProps) {
   const [readiness, setReadiness] = useState<LikertValue | undefined>(undefined);
 
   return (
@@ -53,9 +54,14 @@ export function BeliefCard({ card, onNotMe }: BeliefCardProps) {
 
       <p className="belief-card-question">{card.openQuestion}</p>
 
-      <button type="button" className="belief-card-not-me" onClick={() => onNotMe(card)}>
-        Это не про меня
-      </button>
+      <div className="belief-card-actions">
+        <button type="button" className="belief-card-take-step" onClick={() => onTakeStep(card)}>
+          Взять шаг в работу
+        </button>
+        <button type="button" className="belief-card-not-me" onClick={() => onNotMe(card)}>
+          Это не про меня
+        </button>
+      </div>
     </div>
   );
 }

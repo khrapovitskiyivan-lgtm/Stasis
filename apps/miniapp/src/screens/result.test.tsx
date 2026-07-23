@@ -95,13 +95,13 @@ function makeResult(overrides: Partial<RenderedResult> = {}): RenderedResult {
 
 describe('ResultScreen', () => {
   it('renders the lead element strength framing', () => {
-    render(<ResultScreen result={makeResult()} onSignal={vi.fn()} onShare={vi.fn()} />);
+    render(<ResultScreen result={makeResult()} onSignal={vi.fn()} onShare={vi.fn()} onTakeStep={vi.fn()} />);
     expect(screen.getByText(/огонь/i)).toBeInTheDocument();
   });
 
   it('renders each belief card belief text and the 4 recommendation fields', () => {
     const result = makeResult();
-    render(<ResultScreen result={result} onSignal={vi.fn()} onShare={vi.fn()} />);
+    render(<ResultScreen result={result} onSignal={vi.fn()} onShare={vi.fn()} onTakeStep={vi.fn()} />);
 
     for (const card of result.beliefCards) {
       expect(
@@ -118,7 +118,7 @@ describe('ResultScreen', () => {
 
   it('renders a readiness Likert control per belief card, on a 1-5 scale (spec §6)', () => {
     const result = makeResult();
-    render(<ResultScreen result={result} onSignal={vi.fn()} onShare={vi.fn()} />);
+    render(<ResultScreen result={result} onSignal={vi.fn()} onShare={vi.fn()} onTakeStep={vi.fn()} />);
     const readinessGroups = screen.getAllByRole('radiogroup', { name: /тронуть/i });
     expect(readinessGroups).toHaveLength(result.beliefCards.length);
     // readiness is 1-5, not the 6-point assessment scale
@@ -129,7 +129,7 @@ describe('ResultScreen', () => {
 
   it('renders the strategy profile and all 4 guides', () => {
     const result = makeResult();
-    render(<ResultScreen result={result} onSignal={vi.fn()} onShare={vi.fn()} />);
+    render(<ResultScreen result={result} onSignal={vi.fn()} onShare={vi.fn()} onTakeStep={vi.fn()} />);
     expect(screen.getByText(result.strategy.lead.name)).toBeInTheDocument();
     expect(screen.getByText(result.strategy.lead.gift)).toBeInTheDocument();
     expect(screen.getByText(result.strategy.lead.cost)).toBeInTheDocument();
@@ -145,15 +145,25 @@ describe('ResultScreen', () => {
   it('fires onSignal("not_me", {element, area}) when a belief card "Это не про меня" is clicked', () => {
     const onSignal = vi.fn();
     const result = makeResult();
-    render(<ResultScreen result={result} onSignal={onSignal} onShare={vi.fn()} />);
+    render(<ResultScreen result={result} onSignal={onSignal} onShare={vi.fn()} onTakeStep={vi.fn()} />);
     const notMeButtons = screen.getAllByRole('button', { name: /это не про меня/i });
     fireEvent.click(notMeButtons[1]);
     expect(onSignal).toHaveBeenCalledWith('not_me', { element: 'water', area: 'friends' });
   });
 
+  it('fires onTakeStep(card) when "Взять шаг в работу" is clicked on a belief card', () => {
+    const onTakeStep = vi.fn();
+    const result = makeResult();
+    render(<ResultScreen result={result} onSignal={vi.fn()} onShare={vi.fn()} onTakeStep={onTakeStep} />);
+    const takeStepButtons = screen.getAllByRole('button', { name: /взять шаг/i });
+    expect(takeStepButtons).toHaveLength(result.beliefCards.length);
+    fireEvent.click(takeStepButtons[1]);
+    expect(onTakeStep).toHaveBeenCalledWith(result.beliefCards[1]);
+  });
+
   it('fires onSignal("barnum_me") / onSignal("barnum_generic") on the feedback tap', () => {
     const onSignal = vi.fn();
-    render(<ResultScreen result={makeResult()} onSignal={onSignal} onShare={vi.fn()} />);
+    render(<ResultScreen result={makeResult()} onSignal={onSignal} onShare={vi.fn()} onTakeStep={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: /точно про меня/i }));
     expect(onSignal).toHaveBeenCalledWith('barnum_me');
     fireEvent.click(screen.getByRole('button', { name: /общо/i }));
@@ -162,30 +172,30 @@ describe('ResultScreen', () => {
 
   it('calls onShare when the share button is clicked', () => {
     const onShare = vi.fn();
-    render(<ResultScreen result={makeResult()} onSignal={vi.fn()} onShare={onShare} />);
+    render(<ResultScreen result={makeResult()} onSignal={vi.fn()} onShare={onShare} onTakeStep={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: /поделиться/i }));
     expect(onShare).toHaveBeenCalled();
   });
 
   it('does not show the safety block when resourceState is "ok"', () => {
-    render(<ResultScreen result={makeResult({ resourceState: 'ok' })} onSignal={vi.fn()} onShare={vi.fn()} />);
+    render(<ResultScreen result={makeResult({ resourceState: 'ok' })} onSignal={vi.fn()} onShare={vi.fn()} onTakeStep={vi.fn()} />);
     expect(screen.queryByRole('note')).not.toBeInTheDocument();
   });
 
   it('shows the safety block before belief cards when resourceState is "critical"', () => {
-    render(<ResultScreen result={makeResult({ resourceState: 'critical' })} onSignal={vi.fn()} onShare={vi.fn()} />);
+    render(<ResultScreen result={makeResult({ resourceState: 'critical' })} onSignal={vi.fn()} onShare={vi.fn()} onTakeStep={vi.fn()} />);
     expect(screen.getByRole('note')).toBeInTheDocument();
     expect(screen.getByText(/если сейчас тяжело/i)).toBeInTheDocument();
   });
 
   it('defaults tone to "Бережно" and allows "Прямо" when resourceState is "ok"', () => {
-    render(<ResultScreen result={makeResult({ resourceState: 'ok' })} onSignal={vi.fn()} onShare={vi.fn()} />);
+    render(<ResultScreen result={makeResult({ resourceState: 'ok' })} onSignal={vi.fn()} onShare={vi.fn()} onTakeStep={vi.fn()} />);
     expect(screen.getByRole('button', { name: /бережно/i })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /прямо/i })).not.toBeDisabled();
   });
 
   it('forces and disables "Прямо" tone when resourceState is not "ok"', () => {
-    render(<ResultScreen result={makeResult({ resourceState: 'low' })} onSignal={vi.fn()} onShare={vi.fn()} />);
+    render(<ResultScreen result={makeResult({ resourceState: 'low' })} onSignal={vi.fn()} onShare={vi.fn()} onTakeStep={vi.fn()} />);
     expect(screen.getByRole('button', { name: /бережно/i })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /прямо/i })).toBeDisabled();
   });

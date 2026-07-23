@@ -30,4 +30,13 @@ describe('Consent', () => {
     expect(dispatch).toHaveBeenNthCalledWith(1, { type: 'giveConsent' });
     expect(dispatch).toHaveBeenNthCalledWith(2, { type: 'next' });
   });
+
+  it('renders real (non-"#") policy and offer links from env config', () => {
+    const dispatch = vi.fn();
+    render(<Consent state={initialFlow} dispatch={dispatch} />);
+    const policyLink = screen.getByRole('link', { name: /политикой конфиденциальности/i });
+    const offerLink = screen.getByRole('link', { name: /оферты/i });
+    expect(policyLink).toHaveAttribute('href', 'https://stasis.example/policy');
+    expect(offerLink).toHaveAttribute('href', 'https://stasis.example/offer');
+  });
 });

@@ -7,6 +7,11 @@ export interface ConsentProps {
   dispatch: Dispatch<FlowAction>;
 }
 
+// Real legal-copy URLs, configured per deploy. Falls back to '#' (a no-op
+// anchor) if unset, e.g. in local dev without a .env — never a fake URL.
+const POLICY_URL = ((import.meta as any).env?.VITE_POLICY_URL as string | undefined) ?? '#';
+const OFFER_URL = ((import.meta as any).env?.VITE_OFFER_URL as string | undefined) ?? '#';
+
 export function Consent({ dispatch }: ConsentProps) {
   const [pdnConsent, setPdnConsent] = useState(false);
   const [psychConsent, setPsychConsent] = useState(false);
@@ -26,7 +31,7 @@ export function Consent({ dispatch }: ConsentProps) {
         />
         <span>
           Я согласен(на) на обработку персональных данных в соответствии с{' '}
-          <a href="#" target="_blank" rel="noreferrer">
+          <a href={POLICY_URL} target="_blank" rel="noreferrer">
             Политикой конфиденциальности
           </a>
           .
@@ -56,7 +61,7 @@ export function Consent({ dispatch }: ConsentProps) {
 
       <p className="screen-fineprint">
         Продолжая, вы также принимаете условия{' '}
-        <a href="#" target="_blank" rel="noreferrer">
+        <a href={OFFER_URL} target="_blank" rel="noreferrer">
           Оферты
         </a>
         .

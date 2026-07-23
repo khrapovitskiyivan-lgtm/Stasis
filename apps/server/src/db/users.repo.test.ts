@@ -36,4 +36,28 @@ describe('usersRepo', () => {
     const db = openDb(':memory:');
     expect(usersRepo(db).getByTgId(999)).toBeUndefined();
   });
+
+  it('resurrects a soft-deleted user on re-registration (returning user is not bricked)', () => {
+    const db = openDb(':memory:');
+    const repo = usersRepo(db);
+    const { id } = repo.upsertByTgId(4242, 'ivan', 'ru');
+    // simulate /delete_my_data + a prior follow-up opt-out
+    db.prepare('UPDATE users SET deleted_at = ?, followups_opt_out = 1 WHERE id = ?').run(Date.now(), id);
+    expect(repo.getById(id)).toBeUndefined(); // deleted → hidden
+
+    repo.upsertByTgId(4242, 'ivan', 'ru'); // user re-opens the app → /auth upserts
+    const row = repo.getById(id);
+    expect(row?.tgUserId).toBe(4242); // resurrected, reachable again
+    expect((db.prepare('SELECT deleted_at, followups_opt_out FROM users WHERE id = ?').get(id) as any).deleted_at).toBeNull();
+    expect((db.prepare('SELECT followups_opt_out FROM users WHERE id = ?').get(id) as any).followups_opt_out).toBe(0);
+  });
+
+  it('does NOT reset a live user\'s follow-up opt-out on a normal re-auth', () => {
+    const db = openDb(':memory:');
+    const repo = usersRepo(db);
+    const { id } = repo.upsertByTgId(4242, 'ivan', 'ru');
+    db.prepare('UPDATE users SET followups_opt_out = 1 WHERE id = ?').run(id); // opted out, still live
+    repo.upsertByTgId(4242, 'ivan', 'ru'); // a normal /auth touch
+    expect((db.prepare('SELECT followups_opt_out FROM users WHERE id = ?').get(id) as any).followups_opt_out).toBe(1);
+  });
 });

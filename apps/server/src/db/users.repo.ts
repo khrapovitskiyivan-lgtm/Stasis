@@ -14,7 +14,12 @@ export function usersRepo(db: Db) {
     `INSERT INTO users (tg_user_id, username, lang, created_at) VALUES (?, ?, ?, ?)
      ON CONFLICT(tg_user_id) DO UPDATE SET
        username = COALESCE(excluded.username, users.username),
-       lang = COALESCE(excluded.lang, users.lang)`
+       lang = COALESCE(excluded.lang, users.lang),
+       -- Re-registration resurrects a previously deleted tombstone so a user who
+       -- exercised /delete_my_data can return; opt-out resets ONLY on resurrection
+       -- (never for a live user re-authing, which happens on every /auth).
+       followups_opt_out = CASE WHEN users.deleted_at IS NOT NULL THEN 0 ELSE users.followups_opt_out END,
+       deleted_at = NULL`
   );
   // Unfiltered fetch used only to read back a just-upserted (never-deleted) row.
   const selectAnyByTgId = db.prepare(`SELECT * FROM users WHERE tg_user_id = ?`);

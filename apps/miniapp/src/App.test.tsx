@@ -23,7 +23,22 @@ const fixtureResult: RenderedResult = {
     recommendation: { trigger: 't', action: 'a', minThreshold: 'm', doneCriterion: 'd' },
     reflectiveQuestion: 'q',
   },
-  beliefCards: [],
+  beliefCards: [
+    {
+      element: 'fire',
+      area: 'career',
+      strengthFraming: 'Ты умеешь зажигать дело энергией.',
+      belief: 'Если я не возьму на себя — никто не сделает',
+      pattern: 'Ты берёшь на себя лишнее, а потом выгораешь.',
+      recommendation: {
+        trigger: 'Когда видишь провисающую задачу',
+        action: 'Спроси команду, кто берёт её',
+        minThreshold: '1 раз в неделю',
+        doneCriterion: 'Задача названа с именем ответственного',
+      },
+      openQuestion: 'Знакомо?',
+    },
+  ],
   strategy: {
     lead: { name: 'Превосходство', coreDrive: 'c', childhoodLogic: 'l', underStress: 'u', gift: 'g', cost: 'co', growthNudge: 'gn' },
     guides: [],
@@ -35,6 +50,9 @@ const mockApi = {
   getAssessment: vi.fn().mockResolvedValue(fixtureAssessment),
   submit: vi.fn().mockResolvedValue({ profileId: 1, result: fixtureResult }),
   signal: vi.fn().mockResolvedValue(undefined),
+  recordConsent: vi.fn().mockResolvedValue(undefined),
+  createShare: vi.fn().mockResolvedValue({ slug: 'abc123', url: 'https://api.test?startapp=abc123' }),
+  takeStep: vi.fn().mockResolvedValue(undefined),
 };
 
 vi.mock('./api.js', () => ({
@@ -47,6 +65,10 @@ beforeEach(() => {
   mockApi.getAssessment.mockResolvedValue(fixtureAssessment);
   mockApi.submit.mockResolvedValue({ profileId: 1, result: fixtureResult });
   mockApi.signal.mockResolvedValue(undefined);
+  mockApi.recordConsent.mockResolvedValue(undefined);
+  mockApi.createShare.mockResolvedValue({ slug: 'abc123', url: 'https://api.test?startapp=abc123' });
+  mockApi.takeStep.mockResolvedValue(undefined);
+  delete (globalThis as any).Telegram;
 });
 
 async function driveToResult() {
@@ -80,6 +102,15 @@ describe('App flow smoke test', () => {
   it('drives consent -> intro -> wheel -> resource -> elements -> strategy -> result with a mocked api', async () => {
     await driveToResult();
 
+    // consent recording fires once, after auth, with the current doc version
+    await waitFor(() => expect(mockApi.recordConsent).toHaveBeenCalledTimes(1));
+    expect(mockApi.recordConsent).toHaveBeenCalledWith({
+      docVersion: '2026-07-23',
+      pdn: true,
+      psych: true,
+      age18: true,
+    });
+
     // result: submitted via the mocked api and rendered
     await waitFor(() => expect(mockApi.submit).toHaveBeenCalledTimes(1));
     expect(mockApi.submit.mock.calls[0][0]).toEqual({
@@ -94,6 +125,65 @@ describe('App flow smoke test', () => {
     // ResultScreen's onSignal is wired to api.signal
     fireEvent.click(screen.getByRole('button', { name: /точно про меня/i }));
     expect(mockApi.signal).toHaveBeenCalledWith('barnum_me', undefined);
+  });
+
+  it('clicking "Поделиться" creates a real share then attempts a native Telegram share with the returned url', async () => {
+    const tg = { switchInlineQuery: vi.fn(), openTelegramLink: vi.fn() };
+    (globalThis as any).Telegram = { WebApp: tg };
+
+    await driveToResult();
+    await screen.findByText(/твой результат/i);
+
+    fireEvent.click(screen.getByRole('button', { name: /поделиться/i }));
+
+    expect(mockApi.signal).toHaveBeenCalledWith('share');
+    // profileId comes from api.submit's response, not a placeholder
+    await waitFor(() => expect(mockApi.createShare).toHaveBeenCalledWith(1));
+    await waitFor(() =>
+      expect(tg.openTelegramLink).toHaveBeenCalledWith(
+        expect.stringContaining(encodeURIComponent('https://api.test?startapp=abc123'))
+      )
+    );
+  });
+
+  it('clicking "Взять шаг в работу" on a belief card calls api.takeStep(cardRef, stepText)', async () => {
+    await driveToResult();
+    await screen.findByText(/твой результат/i);
+
+    fireEvent.click(screen.getByRole('button', { name: /взять шаг/i }));
+
+    await waitFor(() =>
+      expect(mockApi.takeStep).toHaveBeenCalledWith(
+        'fire:career',
+        'Спроси команду, кто берёт её'
+      )
+    );
+  });
+
+  it('gates the flow on Intro until the assessment has loaded (Phase-3 dead-end closure)', async () => {
+    let resolveAssessment: (a: Assessment) => void = () => {};
+    mockApi.getAssessment.mockReturnValueOnce(
+      new Promise<Assessment>((resolve) => {
+        resolveAssessment = resolve;
+      })
+    );
+
+    render(<App />);
+    for (const cb of screen.getAllByRole('checkbox')) fireEvent.click(cb);
+    fireEvent.click(screen.getByRole('button', { name: /продолжить/i }));
+
+    const startButton = await screen.findByRole('button', { name: /начать/i });
+    expect(startButton).toBeDisabled();
+
+    fireEvent.click(startButton);
+    // still gated: the wheel screen never mounts while assessment is null
+    expect(screen.queryByRole('slider', { name: 'health' })).not.toBeInTheDocument();
+
+    resolveAssessment(fixtureAssessment);
+    await waitFor(() => expect(startButton).not.toBeDisabled());
+
+    fireEvent.click(startButton);
+    expect(await screen.findByRole('slider', { name: 'health' })).toBeInTheDocument();
   });
 
   it('does not auto-retry submit on failure; retries only on explicit user action', async () => {
