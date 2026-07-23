@@ -434,6 +434,20 @@ body {
   cursor: not-allowed;
 }
 
+/* Tone toggle visibly reframes the Сила block (spec §6): gentle = soft/warm, direct = firm. */
+.result-tone-gentle .result-strength {
+  border-radius: 1rem;
+  border-left: 4px solid color-mix(in srgb, var(--color-water) 55%, var(--color-border));
+  background: color-mix(in srgb, var(--color-water) 8%, var(--color-surface-raised));
+  transition: all 0.2s ease;
+}
+.result-tone-direct .result-strength {
+  border-radius: 0.4rem;
+  border-left: 4px solid var(--color-fire);
+  background: transparent;
+  transition: all 0.2s ease;
+}
+
 .safety-block {
   border-radius: 0.75rem;
   padding: 1rem 1.1rem;

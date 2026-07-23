@@ -6,16 +6,19 @@ export interface LikertProps {
   minLabel?: string;
   maxLabel?: string;
   ariaLabel?: string;
+  /** Number of points on the scale. 6 for assessment items, 5 for the readiness question (spec §6). */
+  max?: 5 | 6;
 }
 
-const OPTIONS: LikertValue[] = [1, 2, 3, 4, 5, 6];
+const ALL_OPTIONS: LikertValue[] = [1, 2, 3, 4, 5, 6];
 
-export function Likert({ value, onChange, minLabel, maxLabel, ariaLabel }: LikertProps) {
+export function Likert({ value, onChange, minLabel, maxLabel, ariaLabel, max = 6 }: LikertProps) {
+  const options = ALL_OPTIONS.slice(0, max);
   return (
     <div className="likert">
       {minLabel ? <span className="likert-label likert-label-min">{minLabel}</span> : null}
       <div className="likert-options" role="radiogroup" aria-label={ariaLabel ?? minLabel ?? 'rating'}>
-        {OPTIONS.map((opt) => {
+        {options.map((opt) => {
           const selected = value === opt;
           return (
             <button

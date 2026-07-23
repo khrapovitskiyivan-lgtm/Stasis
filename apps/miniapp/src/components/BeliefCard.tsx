@@ -22,6 +22,7 @@ export function BeliefCard({ card, onNotMe }: BeliefCardProps) {
         <Likert
           value={readiness}
           onChange={setReadiness}
+          max={5}
           minLabel="Пока не готов(а)"
           maxLabel="Готов(а)"
           ariaLabel="Насколько хочешь это тронуть"

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import type { RenderedResult } from '@stasis/shared';
 import { ResultScreen } from './ResultScreen.js';
 import { MiniInsightScreen } from './MiniInsightScreen.js';
@@ -116,10 +116,15 @@ describe('ResultScreen', () => {
     expect(screen.getByText(result.beliefCards[0].recommendation.delegateVariant!)).toBeInTheDocument();
   });
 
-  it('renders a readiness Likert control per belief card', () => {
+  it('renders a readiness Likert control per belief card, on a 1-5 scale (spec §6)', () => {
     const result = makeResult();
     render(<ResultScreen result={result} onSignal={vi.fn()} onShare={vi.fn()} />);
-    expect(screen.getAllByRole('radiogroup')).toHaveLength(result.beliefCards.length);
+    const readinessGroups = screen.getAllByRole('radiogroup', { name: /тронуть/i });
+    expect(readinessGroups).toHaveLength(result.beliefCards.length);
+    // readiness is 1-5, not the 6-point assessment scale
+    for (const group of readinessGroups) {
+      expect(within(group).getAllByRole('radio')).toHaveLength(5);
+    }
   });
 
   it('renders the strategy profile and all 4 guides', () => {
