@@ -21,4 +21,12 @@ describe('content loader', () => {
     (bundle.sphereInsights.health as any).observation = 'это диагноз для тебя';
     expect(() => validateContent(bundle)).toThrow(ContentError);
   });
+
+  it('catches fused medical compounds but clears the benign "увлечение"', () => {
+    // the real bundle contains «увлечение» (hobby) and must pass (asserted above);
+    // a fused therapy compound must still be caught even without a word boundary.
+    const bundle = loadContent(ROOT);
+    (bundle.strategies.power as any).gift = 'это психотерапия под видом коучинга';
+    expect(() => validateContent(bundle)).toThrow(ContentError);
+  });
 });

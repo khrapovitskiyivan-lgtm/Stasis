@@ -27,21 +27,24 @@ export interface ContentBundle {
 
 const read = (p: string) => yaml.load(readFileSync(p, 'utf8')) as any;
 
-// Word-initial roots only (lookbehind excludes mid-word matches, e.g. "увлечение"
-// contains the substring "лечени" but is not the medical term "лечение").
 const FORBIDDEN_ROOTS = ['диагноз', 'диагностик', 'лечени', 'терапи', 'расстройств', 'гаранти', 'научно доказан'];
-const FORBIDDEN = new RegExp(`(?<![\\p{L}])(?:${FORBIDDEN_ROOTS.join('|')})`, 'iu');
+const FORBIDDEN = new RegExp(`(?:${FORBIDDEN_ROOTS.join('|')})`, 'iu');
+// "увлечение/увлечённость" (hobby) contains "лечени" but is benign — strip such
+// words before scanning. A blanket word-boundary rule would instead miss fused
+// Russian compounds (психотерапия, самолечение, психодиагностика) that must be caught.
+const BENIGN = /увлеч\p{L}*/giu;
+const hasForbidden = (s: string): boolean => FORBIDDEN.test(s.replace(BENIGN, ''));
 
 export function loadContent(rootDir: string): ContentBundle {
   const cm = resolve(rootDir, 'content/matrix');
   const ct = resolve(rootDir, 'content/tests');
-  const strat = read(resolve(cm, 'strategies.yaml'));
-  const insights = read(resolve(cm, 'sphere-insights.yaml'));
-  const cards = read(resolve(cm, 'flagship-cards.yaml'));
-  const els = read(resolve(ct, 'elements.yaml'));
-  const res = read(resolve(ct, 'resource.yaml'));
-
   try {
+    const strat = read(resolve(cm, 'strategies.yaml'));
+    const insights = read(resolve(cm, 'sphere-insights.yaml'));
+    const cards = read(resolve(cm, 'flagship-cards.yaml'));
+    const els = read(resolve(ct, 'elements.yaml'));
+    const res = read(resolve(ct, 'resource.yaml'));
+
     const sphereInsights = Object.fromEntries(
       AREAS.map((a) => [a, SphereInsightSchema.parse(insights.sphereInsights[a])])
     ) as Record<Area, SphereInsight>;
@@ -87,6 +90,7 @@ export function validateContent(b: ContentBundle): void {
   // forbidden lexicon across all human-facing strings
   const strings: string[] = [];
   const walk = (v: any) => { if (typeof v === 'string') strings.push(v); else if (v && typeof v === 'object') Object.values(v).forEach(walk); };
-  walk({ si: b.sphereInsights, mx: b.matrix, st: b.strategies, ig: b.interactionGuides });
-  for (const s of strings) if (FORBIDDEN.test(s)) fail(`forbidden lexicon in content: "${s.slice(0, 40)}…"`);
+  walk({ si: b.sphereInsights, mx: b.matrix, st: b.strategies, ig: b.interactionGuides,
+         stt: b.strategyTest, ei: b.elementItems, ri: b.resourceItems });
+  for (const s of strings) if (hasForbidden(s)) fail(`forbidden lexicon in content: "${s.slice(0, 40)}…"`);
 }
