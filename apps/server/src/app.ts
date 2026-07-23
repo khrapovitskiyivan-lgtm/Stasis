@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
+import type { Bot } from 'grammy';
 import type { Db } from './db/connection.js';
 import { usersRepo } from './db/users.repo.js';
 import { runsRepo } from './db/runs.repo.js';
@@ -10,6 +11,7 @@ import { SubmitPayloadSchema, ConsentPayloadSchema, AREAS } from '@stasis/shared
 import { computeProfile } from './engine/index.js';
 import { renderResult } from './engine/render.js';
 import type { ContentBundle } from './content/loader.js';
+import { webhookHandler } from './bot/webhook.js';
 
 const AUTH_MAX_AGE_SEC = 3 * 3600;
 const SESSION_TTL_SEC = 60 * 60;
@@ -21,12 +23,25 @@ function readSession(req: FastifyRequest, secret: string): { userId: number } {
   return verifySession(token, secret);
 }
 
-export function buildApp(deps: { db: Db; botToken: string; jwtSecret: string; encKey: string; content: ContentBundle }): FastifyInstance {
+export function buildApp(deps: {
+  db: Db;
+  botToken: string;
+  jwtSecret: string;
+  encKey: string;
+  content: ContentBundle;
+  bot?: Bot;
+  webhookSecret?: string;
+}): FastifyInstance {
   const app = Fastify({ logger: false });
   const users = usersRepo(deps.db);
   const runs = runsRepo(deps.db, deps.encKey);
   const signals = signalsRepo(deps.db);
   const consents = consentsRepo(deps.db);
+
+  // Bot is optional (dev without BOT_TOKEN/MINIAPP_URL configured for the bot side).
+  if (deps.bot) {
+    app.post('/webhook', webhookHandler(deps.bot, deps.webhookSecret ?? ''));
+  }
 
   app.post('/auth', async (req, reply) => {
     const header = req.headers.authorization ?? '';
