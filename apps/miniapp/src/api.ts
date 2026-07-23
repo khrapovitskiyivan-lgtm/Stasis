@@ -1,4 +1,4 @@
-import { RenderedResultSchema, type RenderedResult, type SubmitPayload } from '@stasis/shared';
+import { RenderedResultSchema, type Area, type RenderedResult, type SubmitPayload } from '@stasis/shared';
 
 export class ApiError extends Error {
   constructor(
@@ -9,8 +9,16 @@ export class ApiError extends Error {
   }
 }
 
+export interface Assessment {
+  wheelAreas: Area[];
+  elementItems: { id: string; statement: string }[];
+  strategyItems: { id: number; situation: string; statement: string }[];
+  resourceItems: { id: string; statement: string }[];
+}
+
 export interface Api {
   authed(): Promise<void>;
+  getAssessment(): Promise<Assessment>;
   submit(payload: SubmitPayload): Promise<{ profileId: number; result: RenderedResult }>;
   signal(event: string, meta?: unknown): Promise<void>;
 }
@@ -27,6 +35,12 @@ export function createApi(baseUrl: string, initDataRaw: string): Api {
     if (!res.ok) throw new ApiError(res.status, 'auth failed');
     const body = (await res.json()) as { token: string };
     token = body.token;
+  }
+
+  async function getAssessment(): Promise<Assessment> {
+    const res = await fetch(`${baseUrl}/assessment`);
+    if (!res.ok) throw new ApiError(res.status, 'assessment fetch failed');
+    return (await res.json()) as Assessment;
   }
 
   async function submit(payload: SubmitPayload): Promise<{ profileId: number; result: RenderedResult }> {
@@ -63,5 +77,5 @@ export function createApi(baseUrl: string, initDataRaw: string): Api {
     }
   }
 
-  return { authed, submit, signal };
+  return { authed, getAssessment, submit, signal };
 }

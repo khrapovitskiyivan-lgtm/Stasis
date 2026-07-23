@@ -43,6 +43,30 @@ describe('createApi', () => {
     (globalThis as any).fetch = fetchMock;
   });
 
+  it('getAssessment() GETs /assessment with no auth and returns the parsed body', async () => {
+    const assessment = {
+      wheelAreas: ['health'],
+      elementItems: [{ id: 'e1', statement: 's' }],
+      strategyItems: [{ id: 1, situation: 'sit', statement: 'stmt' }],
+      resourceItems: [{ id: 'r1', statement: 's' }],
+    };
+    fetchMock.mockResolvedValueOnce(jsonResponse(assessment));
+    const api = createApi('https://api.test', 'raw');
+    const res = await api.getAssessment();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('https://api.test/assessment');
+    expect(init?.headers?.authorization).toBeUndefined();
+    expect(res).toEqual(assessment);
+  });
+
+  it('getAssessment() throws ApiError on non-ok response', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'boom' }, 500));
+    const api = createApi('https://api.test', 'raw');
+    await expect(api.getAssessment()).rejects.toBeInstanceOf(ApiError);
+  });
+
   it('authed() POSTs /auth with tma header and caches the token', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ token: 'tok123' }));
     const api = createApi('https://api.test', 'raw');
