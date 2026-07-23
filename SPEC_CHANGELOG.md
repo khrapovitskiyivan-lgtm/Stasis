@@ -6,6 +6,11 @@ Reference spec: `docs/superpowers/specs/2026-07-22-stasis-solo-mvp-design.md`.
 
 ---
 
+## 2026-07-23 — Content loader (Phase 2, Task 3)
+
+- **`content/matrix/strategies.yaml`: 32 `howTo` bullets wrapped in double quotes.** Each `interactionGuides[].howTo` entry using the `Заголовок: пояснение` lead-in style contained an unquoted `: ` (colon+space) inside a plain YAML scalar, which is invalid per the YAML block-scalar grammar — `js-yaml` (and any spec-compliant parser) parses it as a single-key mapping (`{ "Заголовок": "пояснение" }`) instead of the intended string, failing `InteractionGuideSchema`'s `howTo: z.array(z.string())`. Fixed by quoting the 32 affected lines (text content unchanged, byte-identical apart from the added `"..."`); the 16 bullets with no internal colon were already valid and untouched. Caught by `apps/server/src/content/loader.test.ts` loading the real bundle.
+- **Forbidden-lexicon regex tightened with a word-start lookbehind** (`apps/server/src/content/loader.ts`, `FORBIDDEN`). The brief's naive alternation `/(...|лечени|...)/i` false-positive-matched the benign word «увлечение» (hobby/passion) — `у-в-Л-Е-Ч-Е-Н-И-е` contains "лечени" as a mid-word substring — which appears in `sphereInsights.hobby.observation` and the `matrix.earth.hobby` card. Neither use has any medical/diagnostic meaning. Changed to `(?<![\p{L}])(?:root1|root2|...)` (unicode-aware, case-insensitive) so roots must start at a word boundary; this still catches the injected-violation test (`'это диагноз для тебя'`) and any genuine standalone occurrence of the forbidden roots, it just no longer fires on unrelated words that happen to contain the same letters mid-word. Not a loosening of intent — a precision fix to the pattern itself.
+
 ## 2026-07-23 — Phase 1 (Foundation) reconciliation
 
 Retroactive entries for drift that occurred while building Phase 1 (spec written for `better-sqlite3`; reality differs). Reverse-spec of what was actually built: `docs/spec-first/phase1-reverse-spec.md`.
