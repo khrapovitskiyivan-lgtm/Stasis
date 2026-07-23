@@ -4,10 +4,12 @@
 export const REGIONS = {
   ru: {
     dataResidency: 'Russia (RU)',
-    // TODO: confirm the exact all-Russia psychological-help line before
-    // shipping this copy to real users — placeholder-but-plausible for now.
+    // NO real phone number here on purpose: a real-but-wrong-scope line could
+    // route an adult in crisis to the wrong service. Confirm the correct adult
+    // crisis line with a professional and replace the placeholder BEFORE launch
+    // (tracked as a pre-launch checklist item, not just this comment).
     crisisSupport:
-      'Если сейчас тяжело, вы можете обратиться за поддержкой: единый общероссийский телефон доверия психологической помощи 8-800-2000-122 (круглосуточно, бесплатно).',
+      'Если сейчас тяжело, вы можете обратиться за поддержкой к специалисту или на линию психологической помощи. [TODO до запуска: подставить подтверждённый телефон доверия для взрослых.]',
   },
   eu: {
     dataResidency: 'European Union (EU)',
