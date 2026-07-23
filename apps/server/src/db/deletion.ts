@@ -1,11 +1,11 @@
 import type { Db } from './connection.js';
 
-// Child tables that reference users.id and exist as of this task. `follow_ups`
-// and `shares` land in later phase-4 tasks; guarded by an existence check so
-// this keeps working once they're added without another migration to this file.
-// Order matters: profiles.test_run_id references test_runs(id), so profiles
-// must go first or the FK constraint rejects the test_runs delete.
-const CHILD_TABLES = ['profiles', 'test_runs', 'consents', 'signals', 'follow_ups', 'shares'] as const;
+// Child tables owned by a user, ordered so FK constraints (PRAGMA foreign_keys=ON)
+// never reject a delete: a referencing row must be deleted BEFORE the row it
+// points at. shares.profile_id -> profiles(id) and profiles.test_run_id ->
+// test_runs(id), so the order is shares -> profiles -> test_runs. Missing tables
+// are skipped via an existence check.
+const CHILD_TABLES = ['shares', 'profiles', 'test_runs', 'consents', 'signals', 'follow_ups'] as const;
 
 function tableExists(db: Db, name: string): boolean {
   const row = db.prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`).get(name);

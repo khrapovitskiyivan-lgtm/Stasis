@@ -6,6 +6,20 @@ Reference spec: `docs/superpowers/specs/2026-07-22-stasis-solo-mvp-design.md`.
 
 ---
 
+## 2026-07-23 — Phase 4 final whole-branch review fixes + deploy prerequisites
+
+Three cross-cutting defects caught only at the whole-branch level (each spanned a task boundary), all fixed with tests:
+- **CRITICAL — returning-user brick:** `usersRepo.upsertByTgId` never cleared `deleted_at`, so a user who exercised `/delete_my_data` could re-open the app, get a JWT, but be 401'd on every data route forever (all use `getById`, which filters `deleted_at IS NULL`). Fixed: `ON CONFLICT DO UPDATE` now sets `deleted_at = NULL` (resurrects the tombstone) and resets `followups_opt_out` **only on resurrection** (`CASE WHEN users.deleted_at IS NOT NULL`), so a live user's opt-out survives a normal re-auth. Tests: resurrection + opt-out-preserved-on-live-reauth.
+- **CRITICAL — `/delete_my_data` FK-order:** `shares.profile_id → profiles(id)` with `PRAGMA foreign_keys=ON`, but `deletion.ts` deleted `profiles` before `shares` → the transaction rolled back and deletion silently failed for any user who had shared (exactly the viral users). Fixed: `CHILD_TABLES` reordered to `shares → profiles → test_runs → …`; deletion test now seeds a `shares` row so the FK order is exercised.
+- **IMPORTANT — share deep-link pointed at the API server:** `/share` built `url` from `PUBLIC_BASE_URL` (the API origin), but a Telegram `startapp` deep link must be `https://t.me/<bot>?startapp=<slug>`. Added a distinct `TG_SHARE_BASE_URL` env (`config.tgShareBaseUrl`) used for the share url; `PUBLIC_BASE_URL` stays the webhook origin.
+
+**Deploy prerequisites (MUST handle before the RU/Yandex launch — code cannot cover these here):**
+- **No migration framework.** All schema lives in `CREATE TABLE IF NOT EXISTS`, which is a no-op on an existing table — so the `users.followups_opt_out` column (and any future change) silently won't apply to a pre-existing DB. A FRESH deploy is fine; but a real migration/versioning path must be added before the second deploy or any schema change post-launch.
+- **OG-image fonts.** `@resvg/resvg-js` bundles no fonts; the share card copy is Cyrillic + emoji (`Я — Огонь 🔥`). A minimal Linux container will render tofu/blank glyphs — bundle Noto Sans (Cyrillic) + a color-emoji font and point `Resvg` at them via the `font` option.
+- Set the full prod env (see `.env.example`): `WEBHOOK_SECRET` (required with `PUBLIC_BASE_URL`), `TG_SHARE_BASE_URL`, `MINIAPP_URL`, `VITE_*`.
+
+---
+
 ## 2026-07-23 — Mini App wiring: real share, take-step, policy links, assessment gate (Phase 4, Task 6)
 
 - **`api.ts` gained `createShare(profileId)` (`POST /share`) and `takeStep(cardRef, stepText)` (`POST /followup`)**, both Bearer-authed like `submit`/`recordConsent` and, like `recordConsent`, NOT best-effort at the transport layer — they throw `ApiError` on a non-ok response so the caller can react. `App.tsx`'s own handlers catch and swallow those rejections at the UI boundary (mirroring the existing consent-recording pattern) so a failed share or follow-up doesn't break the result screen; the user can just tap again.

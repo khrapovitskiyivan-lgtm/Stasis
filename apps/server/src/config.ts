@@ -1,5 +1,5 @@
 export function loadConfig() {
-  const { BOT_TOKEN, JWT_SECRET, DATABASE_PATH, PORT, DATA_ENC_KEY, WEBHOOK_SECRET, MINIAPP_URL, PUBLIC_BASE_URL } = process.env;
+  const { BOT_TOKEN, JWT_SECRET, DATABASE_PATH, PORT, DATA_ENC_KEY, WEBHOOK_SECRET, MINIAPP_URL, PUBLIC_BASE_URL, TG_SHARE_BASE_URL } = process.env;
   if (!BOT_TOKEN) throw new Error('BOT_TOKEN is required');
   if (!JWT_SECRET) throw new Error('JWT_SECRET is required');
   if (!DATA_ENC_KEY) throw new Error('DATA_ENC_KEY is required');
@@ -19,5 +19,8 @@ export function loadConfig() {
     webhookSecret: WEBHOOK_SECRET,
     miniappUrl: MINIAPP_URL,
     publicBaseUrl: PUBLIC_BASE_URL,
+    // Telegram deep-link base for share links, e.g. https://t.me/<bot> (or
+    // https://t.me/<bot>/<app>). Distinct from PUBLIC_BASE_URL (the API origin).
+    tgShareBaseUrl: TG_SHARE_BASE_URL,
   };
 }

@@ -37,6 +37,7 @@ export function buildApp(deps: {
   bot?: Bot;
   webhookSecret?: string;
   publicBaseUrl?: string;
+  tgShareBaseUrl?: string;
 }): FastifyInstance {
   const app = Fastify({ logger: false });
   const users = usersRepo(deps.db);
@@ -161,7 +162,8 @@ export function buildApp(deps: {
     if (!leadElement) return reply.code(404).send({ error: 'profile_not_found' });
     const payload = buildSharePayload(leadElement);
     const { slug } = shares.create(profileId, userId, payload);
-    return { slug, url: `${deps.publicBaseUrl ?? ''}?startapp=${slug}` };
+    // Deep link opens the Mini App in Telegram (t.me/<bot>), NOT the API origin.
+    return { slug, url: `${deps.tgShareBaseUrl ?? ''}?startapp=${slug}` };
   });
 
   // Public: resolve a share slug to its witness-copy payload only. No auth,

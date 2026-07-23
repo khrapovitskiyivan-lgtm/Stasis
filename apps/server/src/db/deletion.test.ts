@@ -23,6 +23,9 @@ function seed(db: ReturnType<typeof openDb>) {
     'v1'
   );
   consentsRepo(db).record(userId, 'v1');
+  // A share references profiles(id) via FK — exercises the delete-order (shares before profiles).
+  db.prepare('INSERT INTO shares (slug, profile_id, user_id, public_payload, created_at) VALUES (?, ?, ?, ?, ?)')
+    .run('slug-abc', profileId, userId, '{}', Date.now());
   return { userId, profileId };
 }
 
@@ -34,12 +37,14 @@ describe('deleteUserData', () => {
     expect((db.prepare('SELECT COUNT(*) c FROM test_runs WHERE user_id = ?').get(userId) as any).c).toBe(1);
     expect((db.prepare('SELECT COUNT(*) c FROM profiles WHERE user_id = ?').get(userId) as any).c).toBe(1);
     expect((db.prepare('SELECT COUNT(*) c FROM consents WHERE user_id = ?').get(userId) as any).c).toBe(3);
+    expect((db.prepare('SELECT COUNT(*) c FROM shares WHERE user_id = ?').get(userId) as any).c).toBe(1);
 
-    deleteUserData(db, 4242);
+    deleteUserData(db, 4242); // must NOT throw despite the shares->profiles FK
 
     expect((db.prepare('SELECT COUNT(*) c FROM test_runs WHERE user_id = ?').get(userId) as any).c).toBe(0);
     expect((db.prepare('SELECT COUNT(*) c FROM profiles WHERE user_id = ?').get(userId) as any).c).toBe(0);
     expect((db.prepare('SELECT COUNT(*) c FROM consents WHERE user_id = ?').get(userId) as any).c).toBe(0);
+    expect((db.prepare('SELECT COUNT(*) c FROM shares WHERE user_id = ?').get(userId) as any).c).toBe(0);
 
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as any;
     expect(user.deleted_at).not.toBeNull();
