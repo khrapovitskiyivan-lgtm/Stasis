@@ -19,6 +19,7 @@ const app = buildApp({
   content,
   bot,
   webhookSecret: cfg.webhookSecret,
+  publicBaseUrl: cfg.publicBaseUrl,
 });
 
 app.listen({ port: cfg.port, host: '0.0.0.0' }).then(async () => {

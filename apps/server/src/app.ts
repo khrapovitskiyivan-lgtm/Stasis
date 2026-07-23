@@ -5,11 +5,13 @@ import { usersRepo } from './db/users.repo.js';
 import { runsRepo } from './db/runs.repo.js';
 import { signalsRepo, isSignalEvent } from './db/signals.repo.js';
 import { consentsRepo } from './db/consents.repo.js';
+import { sharesRepo } from './db/shares.repo.js';
 import { verifyInitData, InitDataError } from './auth/init-data.js';
 import { issueSession, verifySession, SessionError } from './auth/session.js';
-import { SubmitPayloadSchema, ConsentPayloadSchema, AREAS } from '@stasis/shared';
+import { SubmitPayloadSchema, ConsentPayloadSchema, AREAS, type Element } from '@stasis/shared';
 import { computeProfile } from './engine/index.js';
 import { renderResult } from './engine/render.js';
+import { buildSharePayload } from './share/payload.js';
 import type { ContentBundle } from './content/loader.js';
 import { webhookHandler } from './bot/webhook.js';
 
@@ -31,12 +33,17 @@ export function buildApp(deps: {
   content: ContentBundle;
   bot?: Bot;
   webhookSecret?: string;
+  publicBaseUrl?: string;
 }): FastifyInstance {
   const app = Fastify({ logger: false });
   const users = usersRepo(deps.db);
   const runs = runsRepo(deps.db, deps.encKey);
   const signals = signalsRepo(deps.db);
   const consents = consentsRepo(deps.db);
+  const shares = sharesRepo(deps.db);
+  const selectOwnProfile = deps.db.prepare(
+    `SELECT lead_element FROM profiles WHERE id = ? AND user_id = ?`
+  );
 
   // Bot is optional (dev without BOT_TOKEN/MINIAPP_URL configured for the bot side).
   if (deps.bot) {
@@ -127,6 +134,36 @@ export function buildApp(deps: {
     if (!parsed.success) return reply.code(400).send({ error: 'invalid_payload' });
     consents.record(userId, parsed.data.docVersion);
     return { ok: true };
+  });
+
+  app.post('/share', async (req, reply) => {
+    let userId: number;
+    try {
+      userId = readSession(req, deps.jwtSecret).userId;
+    } catch (e) {
+      if (e instanceof SessionError) return reply.code(401).send({ error: 'invalid_session' });
+      throw e;
+    }
+    if (!users.getById(userId)) return reply.code(401).send({ error: 'invalid_session' });
+    const body = (req.body ?? {}) as { profileId?: unknown };
+    const profileId = Number(body.profileId);
+    if (!Number.isInteger(profileId) || profileId <= 0) return reply.code(400).send({ error: 'invalid_payload' });
+    // Ownership check: a profile only shares if it belongs to the caller —
+    // otherwise anyone could mint a public share link for someone else's result.
+    const row = selectOwnProfile.get(profileId, userId) as { lead_element: Element } | undefined;
+    if (!row) return reply.code(404).send({ error: 'profile_not_found' });
+    const payload = buildSharePayload(row.lead_element);
+    const { slug } = shares.create(profileId, userId, payload);
+    return { slug, url: `${deps.publicBaseUrl ?? ''}?startapp=${slug}` };
+  });
+
+  // Public: resolve a share slug to its witness-copy payload only. No auth,
+  // no PII, no wheel/spheres/answers/belief text — see share/payload.ts.
+  app.get('/share/:slug', async (req, reply) => {
+    const { slug } = req.params as { slug: string };
+    const row = shares.getBySlug(slug);
+    if (!row) return reply.code(404).send({ error: 'not_found' });
+    return row.publicPayload;
   });
 
   return app;

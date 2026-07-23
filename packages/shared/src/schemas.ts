@@ -92,3 +92,13 @@ export const RenderedResultSchema = z.object({
   strategy: z.object({ lead: StrategyProfileSchema, guides: z.array(InteractionGuideSchema) }),
 });
 export type RenderedResult = z.infer<typeof RenderedResultSchema>;
+
+// Public share payload: witness-copy only. Deliberately excludes scores,
+// spheres, answers, and belief/matrix text — this is the only shape that
+// ever reaches an unauthenticated /share/:slug response.
+export const SharePublicPayloadSchema = z.object({
+  leadElement: elementEnum,
+  headline: z.string().min(1),
+  blurb: z.string().min(1),
+});
+export type SharePublicPayload = z.infer<typeof SharePublicPayloadSchema>;

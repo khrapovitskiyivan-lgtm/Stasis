@@ -45,4 +45,12 @@ export function runMigrations(db: Db): void {
     user_id INTEGER NOT NULL REFERENCES users(id),
     kind TEXT NOT NULL, doc_version TEXT NOT NULL, granted_at INTEGER NOT NULL
   );`);
+  db.exec(`CREATE TABLE IF NOT EXISTS shares (
+    slug TEXT PRIMARY KEY,
+    profile_id INTEGER NOT NULL REFERENCES profiles(id),
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    public_payload TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    revoked_at INTEGER
+  );`);
 }
