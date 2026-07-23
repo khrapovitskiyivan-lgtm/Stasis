@@ -5,6 +5,9 @@ export function loadConfig() {
   if (!DATA_ENC_KEY) throw new Error('DATA_ENC_KEY is required');
   // Fail fast at startup rather than 500-ing on the first /submit with a bad key.
   if (!/^[0-9a-fA-F]{64}$/.test(DATA_ENC_KEY)) throw new Error('DATA_ENC_KEY must be 32 bytes hex (64 chars)');
+  // A public webhook MUST have a secret — otherwise a forged update could invoke
+  // privileged bot commands (e.g. /delete_my_data) for any tg id. Refuse to boot.
+  if (PUBLIC_BASE_URL && !WEBHOOK_SECRET) throw new Error('WEBHOOK_SECRET is required when PUBLIC_BASE_URL is set');
   return {
     botToken: BOT_TOKEN,
     jwtSecret: JWT_SECRET,
