@@ -1,7 +1,7 @@
 import { REGIONS, type Region } from './regions.js';
 
 export function loadConfig() {
-  const { BOT_TOKEN, JWT_SECRET, DATABASE_PATH, PORT, DATA_ENC_KEY, WEBHOOK_SECRET, MINIAPP_URL, PUBLIC_BASE_URL, TG_SHARE_BASE_URL, REGION } = process.env;
+  const { BOT_TOKEN, JWT_SECRET, DATABASE_PATH, PORT, DATA_ENC_KEY, WEBHOOK_SECRET, MINIAPP_URL, PUBLIC_BASE_URL, TG_SHARE_BASE_URL, REGION, MINIAPP_DIST } = process.env;
   if (!BOT_TOKEN) throw new Error('BOT_TOKEN is required');
   if (!JWT_SECRET) throw new Error('JWT_SECRET is required');
   if (!DATA_ENC_KEY) throw new Error('DATA_ENC_KEY is required');
@@ -29,5 +29,9 @@ export function loadConfig() {
     // Telegram deep-link base for share links, e.g. https://t.me/<bot> (or
     // https://t.me/<bot>/<app>). Distinct from PUBLIC_BASE_URL (the API origin).
     tgShareBaseUrl: TG_SHARE_BASE_URL,
+    // Absolute (or cwd-relative) path to the built Mini App `dist`. Optional
+    // and unset by default: dev/tests keep `GET /` as a plain 404, and only
+    // the deploy image sets this so one HTTPS origin serves the SPA + API.
+    miniappDist: MINIAPP_DIST,
   };
 }

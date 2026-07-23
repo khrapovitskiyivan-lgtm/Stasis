@@ -26,6 +26,7 @@ const app = buildApp({
   publicBaseUrl: cfg.publicBaseUrl,
   tgShareBaseUrl: cfg.tgShareBaseUrl,
   region: cfg.region,
+  miniappDist: cfg.miniappDist,
 });
 
 app.listen({ port: cfg.port, host: '0.0.0.0' }).then(async () => {
