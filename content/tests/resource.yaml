@@ -1,0 +1,10 @@
+# PROVISIONAL — spike-gated by pilot (see docs/spec-first/track-map.md); items may be culled/rewritten after EFA.
+# Stasis — блок «Ресурсность/стресс» (энергия/сон/выгорание).
+# key: distress помечает два пункта скрининга безопасности (не диагноз).
+version: 0.1.0-provisional
+window: "последние 2 недели"
+items:
+  - { id: r-energy,    key: direct,   statement: "В последние две недели у меня достаточно сил на важные дела." }
+  - { id: r-sleep,     key: direct,   statement: "Я просыпаюсь отдохнувшим и восстановившимся." }
+  - { id: r-exhaust,   key: distress, statement: "В последнее время я чувствую себя эмоционально опустошённым." }
+  - { id: r-anhedonia, key: distress, statement: "Дела, которые обычно радовали, сейчас почти не приносят удовольствия." }
