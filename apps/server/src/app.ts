@@ -6,9 +6,10 @@ import { runsRepo } from './db/runs.repo.js';
 import { signalsRepo, isSignalEvent } from './db/signals.repo.js';
 import { consentsRepo } from './db/consents.repo.js';
 import { sharesRepo } from './db/shares.repo.js';
+import { profilesRepo } from './db/profiles.repo.js';
 import { verifyInitData, InitDataError } from './auth/init-data.js';
 import { issueSession, verifySession, SessionError } from './auth/session.js';
-import { SubmitPayloadSchema, ConsentPayloadSchema, AREAS, type Element } from '@stasis/shared';
+import { SubmitPayloadSchema, ConsentPayloadSchema, AREAS } from '@stasis/shared';
 import { computeProfile } from './engine/index.js';
 import { renderResult } from './engine/render.js';
 import { buildSharePayload } from './share/payload.js';
@@ -41,9 +42,7 @@ export function buildApp(deps: {
   const signals = signalsRepo(deps.db);
   const consents = consentsRepo(deps.db);
   const shares = sharesRepo(deps.db);
-  const selectOwnProfile = deps.db.prepare(
-    `SELECT lead_element FROM profiles WHERE id = ? AND user_id = ?`
-  );
+  const profiles = profilesRepo(deps.db);
 
   // Bot is optional (dev without BOT_TOKEN/MINIAPP_URL configured for the bot side).
   if (deps.bot) {
@@ -150,9 +149,9 @@ export function buildApp(deps: {
     if (!Number.isInteger(profileId) || profileId <= 0) return reply.code(400).send({ error: 'invalid_payload' });
     // Ownership check: a profile only shares if it belongs to the caller —
     // otherwise anyone could mint a public share link for someone else's result.
-    const row = selectOwnProfile.get(profileId, userId) as { lead_element: Element } | undefined;
-    if (!row) return reply.code(404).send({ error: 'profile_not_found' });
-    const payload = buildSharePayload(row.lead_element);
+    const leadElement = profiles.getOwnedLeadElement(profileId, userId);
+    if (!leadElement) return reply.code(404).send({ error: 'profile_not_found' });
+    const payload = buildSharePayload(leadElement);
     const { slug } = shares.create(profileId, userId, payload);
     return { slug, url: `${deps.publicBaseUrl ?? ''}?startapp=${slug}` };
   });
