@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
-import { AREAS, type RenderedResult, type SubmitPayload } from '@stasis/shared';
+import { AREAS, type BeliefCard as BeliefCardData, type RenderedResult, type SubmitPayload } from '@stasis/shared';
 import { initTelegram } from './telegram.js';
 import { createApi, type Api, type Assessment } from './api.js';
 import { flowReducer, initialFlow } from './flow.js';
@@ -20,6 +20,7 @@ export function App() {
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [result, setResult] = useState<RenderedResult | null>(null);
+  const [profileId, setProfileId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [retryNonce, setRetryNonce] = useState(0);
@@ -98,7 +99,10 @@ export function App() {
     setSubmitError(null);
     api
       .submit(payload)
-      .then(({ result: r }) => setResult(r))
+      .then(({ profileId: id, result: r }) => {
+        setProfileId(id);
+        setResult(r);
+      })
       .catch(() => setSubmitError('Не удалось получить результат. Попробуйте ещё раз.'))
       .finally(() => setSubmitting(false));
     // retryNonce is a dependency so an explicit retry (which resets the ref) re-runs this.
@@ -119,11 +123,32 @@ export function App() {
 
   const handleShare = useCallback(() => {
     api?.signal('share');
-    // TODO(Phase 4): real deep-link + OG image sharing (spec §12.3). For now,
-    // best-effort native Telegram share only.
-    const tg = (globalThis as any).Telegram?.WebApp;
-    tg?.switchInlineQuery?.('Stasis');
-  }, [api]);
+    if (!api || profileId == null) return;
+    api
+      .createShare(profileId)
+      .then(({ url }) => {
+        const tg = (globalThis as any).Telegram?.WebApp;
+        if (tg?.openTelegramLink) {
+          tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(url)}`);
+        } else {
+          tg?.switchInlineQuery?.(url);
+        }
+      })
+      .catch(() => {
+        // Best-effort with respect to the UI: a failed share-link creation
+        // must not break the result screen. Retryable via a second tap.
+      });
+  }, [api, profileId]);
+
+  const handleTakeStep = useCallback(
+    (card: BeliefCardData) => {
+      api?.takeStep(`${card.element}:${card.area}`, card.recommendation.action).catch(() => {
+        // Best-effort with respect to the UI: a failed follow-up schedule
+        // must not break the result screen. Retryable via a second tap.
+      });
+    },
+    [api]
+  );
 
   let content;
   switch (state.step) {
@@ -131,7 +156,7 @@ export function App() {
       content = <Consent state={state} dispatch={dispatch} />;
       break;
     case 'intro':
-      content = <Intro state={state} dispatch={dispatch} />;
+      content = <Intro state={state} dispatch={dispatch} ready={assessment != null} />;
       break;
     case 'wheel':
       content = <WheelScreen state={state} dispatch={dispatch} />;
@@ -163,7 +188,14 @@ export function App() {
       break;
     case 'result':
       if (result) {
-        content = <ResultScreen result={result} onSignal={handleSignal} onShare={handleShare} />;
+        content = (
+          <ResultScreen
+            result={result}
+            onSignal={handleSignal}
+            onShare={handleShare}
+            onTakeStep={handleTakeStep}
+          />
+        );
       } else if (submitError) {
         content = (
           <div className="screen">

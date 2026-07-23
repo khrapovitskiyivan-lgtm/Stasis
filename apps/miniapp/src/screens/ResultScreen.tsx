@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import type { Element, RenderedResult } from '@stasis/shared';
+import type { BeliefCard as BeliefCardData, Element, RenderedResult } from '@stasis/shared';
 import { BeliefCard } from '../components/BeliefCard.js';
 
 export interface ResultScreenProps {
   result: RenderedResult;
   onSignal: (event: string, meta?: unknown) => void;
   onShare: () => void;
+  onTakeStep: (card: BeliefCardData) => void;
 }
 
 type Tone = 'gentle' | 'direct';
@@ -33,7 +34,7 @@ const RESOURCE_STATE_COPY: Record<RenderedResult['resourceState'], string> = {
 const SAFETY_TEXT =
   'Если сейчас тяжело — вы можете обратиться за поддержкой к специалисту или на линию психологической помощи.';
 
-export function ResultScreen({ result, onSignal, onShare }: ResultScreenProps) {
+export function ResultScreen({ result, onSignal, onShare, onTakeStep }: ResultScreenProps) {
   const [tone, setTone] = useState<Tone>('gentle');
   const toneLocked = result.resourceState !== 'ok';
   const effectiveTone: Tone = toneLocked ? 'gentle' : tone;
@@ -91,6 +92,7 @@ export function ResultScreen({ result, onSignal, onShare }: ResultScreenProps) {
             key={idx}
             card={card}
             onNotMe={(c) => onSignal('not_me', { element: c.element, area: c.area })}
+            onTakeStep={onTakeStep}
           />
         ))}
       </div>
