@@ -5,6 +5,13 @@ export function initTelegram(): TgContext {
   if (wa?.initData) {
     wa.ready?.();
     wa.expand?.();
+    // App-like fullscreen mobile mode (Bot API 8.0+). Each call is guarded:
+    // older clients and Telegram Desktop lack these methods (or throw
+    // "unsupported"), and bootstrap must never break — there we just keep the
+    // expand()ed full-height view as the fallback.
+    try { wa.requestFullscreen?.(); } catch { /* unsupported client → expand() stands */ }
+    try { wa.disableVerticalSwipes?.(); } catch { /* pre-7.7 client */ }
+    try { wa.lockOrientation?.(); } catch { /* pre-8.0 client */ }
     return { initDataRaw: wa.initData, theme: wa.colorScheme === 'dark' ? 'dark' : 'light' };
   }
   // Dev-only fallback for local/browser runs without the Telegram bridge.

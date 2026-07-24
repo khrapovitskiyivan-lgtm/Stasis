@@ -49,6 +49,18 @@ body,
   height: 100%;
 }
 
+/* Telegram fullscreen mode (Bot API 8.0) overlays the app under the status bar
+   and the floating close/menu controls. Expose a single top-offset token: the
+   device safe-area plus Telegram's content safe-area (its floating controls),
+   with an env() fallback for plain-browser runs. Bottom guards the home bar. */
+:root {
+  --safe-top: calc(
+    var(--tg-safe-area-inset-top, env(safe-area-inset-top, 0px)) +
+    var(--tg-content-safe-area-inset-top, 0px)
+  );
+  --safe-bottom: var(--tg-safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -59,12 +71,18 @@ body {
 
 .app-shell {
   min-height: 100%;
+  min-height: 100dvh;
+  min-height: var(--tg-viewport-stable-height, 100dvh);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 2.5rem;
-  padding: 3rem 1.5rem;
+  /* Keep the base 3rem breathing room, but grow the top/bottom padding when a
+     safe-area inset is present so titles clear the status bar and Telegram's
+     fullscreen controls, and the last button clears the home indicator. */
+  padding: max(3rem, calc(var(--safe-top) + 1.25rem)) 1.5rem
+    max(3rem, calc(var(--safe-bottom) + 1.25rem));
   text-align: center;
 }
 
