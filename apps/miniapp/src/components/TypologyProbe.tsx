@@ -17,7 +17,7 @@ export function TypologyProbe({ axisLabel, options, onReport }: TypologyProbePro
 
   if (answered) {
     return (
-      <div className="typology-probe typology-probe-done" role="note">
+      <div className="typology-probe typology-probe-done" role="note" aria-live="polite">
         <p className="screen-text">Спасибо.</p>
       </div>
     );

@@ -265,6 +265,30 @@ describe('ResultScreen', () => {
     render(<ResultScreen result={r} onSignal={vi.fn()} onShare={vi.fn()} onTakeStep={vi.fn()} />);
     expect(screen.getByText(/с оттенком Уклонение/i)).toBeInTheDocument();
   });
+
+  it('two-probe independence: answering the element probe leaves the strategy probe live', () => {
+    const onSignal = vi.fn();
+    const base = makeResult();
+    const r = makeResult({
+      elementState: 'none',
+      secondElement: 'water',
+      strategy: { state: 'none', lead: base.strategy.lead, second: null, guides: [] },
+    });
+    render(<ResultScreen result={r} onSignal={onSignal} onShare={vi.fn()} onTakeStep={vi.fn()} />);
+
+    const elementGroup = screen.getByRole('group', { name: /самоотчёт: стихия/i });
+    expect(screen.getByRole('group', { name: /самоотчёт: стратегия/i })).toBeInTheDocument();
+
+    fireEvent.click(within(elementGroup).getByRole('button', { name: /выраженной нет/i }));
+    expect(onSignal).toHaveBeenCalledWith('typology_self_report', {
+      axis: 'element', measured: 'none', selfReport: 'balanced',
+    });
+
+    // Re-query fresh: answering the element probe re-renders, so a stale handle to the
+    // strategy group could be misleading. The strategy probe must still be live/interactive.
+    const strategyGroup = screen.getByRole('group', { name: /самоотчёт: стратегия/i });
+    expect(within(strategyGroup).getByRole('button', { name: /выраженной нет/i })).toBeInTheDocument();
+  });
 });
 
 describe('MiniInsightScreen', () => {
