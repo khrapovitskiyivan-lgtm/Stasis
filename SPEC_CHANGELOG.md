@@ -6,6 +6,14 @@ Reference spec: `docs/superpowers/specs/2026-07-22-stasis-solo-mvp-design.md`.
 
 ---
 
+## 2026-07-24 — Typology determinacy gate (Task 1, server): `profiles.is_mixed`/`is_strategy_mixed` become floor-aware
+
+- **Engine now emits a three-state `Determinacy` (`'confident' | 'mixed' | 'none'`) per axis instead of a binary "mixed" flag.** `rank()` (`apps/server/src/engine/scoring.ts`) first checks the lead score clears a `DETERMINACY_FLOOR` (3.5, the 1–6 scale midpoint) — below it, the profile is `'none'` (nothing endorsed clearly enough to call a lead at all), not a forced pick of the first-listed element/strategy. Only above the floor does the old lead-minus-second `DETERMINACY_GAP` (0.5) distinguish `'confident'` from `'mixed'`. Threaded through `computeProfile` (`elementState`/`strategyState`, replacing `isMixed`/`isStrategyMixed`), `renderResult` (`RenderedResult.elementState`, `RenderedResult.strategy.state`), and the `RenderedResultSchema` contract in `packages/shared/src/schemas.ts`.
+- **Drift: `profiles.is_mixed` / `is_strategy_mixed` DB columns are now derived from the new determinacy state as "lead not decisive" — `state !== 'confident'` — true for BOTH `'mixed'` and `'none'`, not only `'mixed'`.** (`apps/server/src/db/runs.repo.ts`.) Previously these columns were `true` only when the lead-minus-second gap was small (the old binary formula); a flat/low-endorsement profile that now reads `'none'` would previously have stored `is_mixed = false`, silently making an undecided profile look decisive. This was caught in review and fixed before merge; no code ever shipped the old formula against the new engine. Schema/column names unchanged — no migration needed. Since the prototype DB is throwaway pre-launch data, no backfill was done or is needed. Covered by `apps/server/src/db/runs.repo.test.ts` (new), which persists a run and reads the row back for all three states on both axes.
+- **`apps/miniapp` is intentionally left referencing the old `isMixed`/flat `strategy.lead` shape** — the client-side render is a separate, later task; it currently fails `tsc --noEmit` until that task lands. Not a regression introduced silently: flagged in the Task 1 report.
+
+---
+
 ## 2026-07-23 — Phase 4 final whole-branch review fixes + deploy prerequisites
 
 Three cross-cutting defects caught only at the whole-branch level (each spanned a task boundary), all fixed with tests:

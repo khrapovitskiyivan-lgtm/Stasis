@@ -24,10 +24,12 @@ export function runsRepo(db: Db, encKey: string) {
       const run = insRun.run(userId, contentVersion, enc(payload.wheel), enc(payload.elementAnswers),
         enc(payload.strategyAnswers), enc(payload.resourceAnswers), now);
       const testRunId = Number(run.lastInsertRowid);
+      // is_mixed / is_strategy_mixed mean "lead not decisive" — true for BOTH 'mixed' and
+      // 'none' determinacy states, not just 'mixed'. See SPEC_CHANGELOG.md for the drift note.
       const p = insProfile.run(testRunId, userId, profile.leadElement, profile.secondElement ?? null,
-        profile.elementState === 'mixed' ? 1 : 0, JSON.stringify(profile.weakAreas), profile.resourceState,
+        profile.elementState !== 'confident' ? 1 : 0, JSON.stringify(profile.weakAreas), profile.resourceState,
         JSON.stringify(profile.beliefCardIds), profile.leadStrategy, profile.secondStrategy ?? null,
-        profile.strategyState === 'mixed' ? 1 : 0, JSON.stringify(profile.guideRefs), ENGINE_VERSION, contentVersion, now);
+        profile.strategyState !== 'confident' ? 1 : 0, JSON.stringify(profile.guideRefs), ENGINE_VERSION, contentVersion, now);
       return { profileId: Number(p.lastInsertRowid) };
     },
   };
