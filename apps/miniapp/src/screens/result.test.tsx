@@ -209,6 +209,13 @@ describe('ResultScreen', () => {
     expect(screen.queryByText(/твоя стихия —/i)).not.toBeInTheDocument();
   });
 
+  it('element "mixed" state renders both elements and hides the single-element claim', () => {
+    render(<ResultScreen result={makeResult({ elementState: 'mixed', secondElement: 'water' })}
+      onSignal={vi.fn()} onShare={vi.fn()} onTakeStep={vi.fn()} />);
+    expect(screen.getByText(/смешанный профиль/i)).toBeInTheDocument();
+    expect(screen.queryByText(/твоя стихия —/i)).not.toBeInTheDocument();
+  });
+
   it('strategy "none" state hides the profile and guides', () => {
     const r = makeResult({ strategy: { state: 'none', lead: makeResult().strategy.lead, second: null, guides: [] } });
     render(<ResultScreen result={r} onSignal={vi.fn()} onShare={vi.fn()} onTakeStep={vi.fn()} />);

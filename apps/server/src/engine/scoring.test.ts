@@ -80,6 +80,30 @@ describe('scoreStrategies determinacy', () => {
     const r = scoreStrategies(answers, STRAT_ITEMS);
     expect(r.state).toBe('mixed');
   });
+
+  it('floor boundary: a lead scoring exactly 3.5 clears the floor (strict <, not <=)', () => {
+    // power items (1-4) = [3,4,3,4] -> mean 3.5 exactly; everything else = 1
+    const answers = STRAT_ITEMS.map((i) =>
+      i.loads === 'power' ? answer(i.id, [3, 4, 3, 4][i.id - 1]) : answer(i.id, 1)
+    );
+    const r = scoreStrategies(answers, STRAT_ITEMS);
+    expect(r.scores.power).toBe(3.5); // confirm the mean lands exactly on the floor
+    expect(r.lead).toBe('power');
+    expect(r.state).toBe('confident');
+  });
+
+  it('gap boundary: a 0.5 lead-over-second margin reads as mixed (<=, not <)', () => {
+    // avoidance (13-16) all 4 -> mean 4.0; power (1-4) = [3,4,3,4] -> mean 3.5; others = 1
+    const answers = STRAT_ITEMS.map((i) => {
+      if (i.loads === 'avoidance') return answer(i.id, 4);
+      if (i.loads === 'power') return answer(i.id, [3, 4, 3, 4][i.id - 1]);
+      return answer(i.id, 1);
+    });
+    const r = scoreStrategies(answers, STRAT_ITEMS);
+    expect(r.scores.avoidance).toBe(4);
+    expect(r.scores.power).toBe(3.5); // confirm the exact 0.5 gap between lead and second
+    expect(r.state).toBe('mixed');
+  });
 });
 
 describe('scoreResource', () => {

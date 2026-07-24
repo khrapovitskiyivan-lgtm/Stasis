@@ -38,4 +38,15 @@ describe('computeProfile', () => {
     // but NOT fire.health, so only the present card is referenced (exclusion pinned).
     expect(p.beliefCardIds).toEqual([{ element: 'fire', area: 'career' }]);
   });
+
+  it('flags elementState/strategyState as "none" for a flat/low answer set (no lead clears the floor)', () => {
+    const elementAnswers = content.elementItems.map((i) => ({ itemId: i.id, value: 2 }));
+    const strategyAnswers = content.strategyTest.items.map((i) => ({ itemId: `s${i.id}`, value: 2 }));
+    const p = computeProfile(elementAnswers, strategyAnswers, wheel, res, content);
+    expect(p.elementState).toBe('none');
+    expect(p.strategyState).toBe('none');
+    // sanity: state is always one of the three determinacy values, never anything else
+    expect(['confident', 'mixed', 'none']).toContain(p.elementState);
+    expect(['confident', 'mixed', 'none']).toContain(p.strategyState);
+  });
 });
