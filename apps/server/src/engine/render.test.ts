@@ -23,6 +23,8 @@ describe('renderResult', () => {
     expect(r.strategy.guides).toHaveLength(4); // 4 outgoing
     // no bare refs leak: belief cards carry real text
     expect(r.beliefCards[0]?.belief.length ?? 0).toBeGreaterThan(0);
+    expect(r.elementState).toBeDefined();
+    expect(r.strategy.state).toBeDefined();
   });
 
   it('falls back to the lowest sphere when no area is weak (all-high wheel)', () => {

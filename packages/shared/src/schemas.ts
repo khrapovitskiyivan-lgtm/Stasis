@@ -85,11 +85,17 @@ export const InteractionGuideSchema = z.object({
 export type InteractionGuide = z.infer<typeof InteractionGuideSchema>;
 
 export const RenderedResultSchema = z.object({
-  leadElement: elementEnum, secondElement: elementEnum.nullable(), isMixed: z.boolean(),
+  leadElement: elementEnum, secondElement: elementEnum.nullable(),
+  elementState: z.enum(['confident', 'mixed', 'none']),
   resourceState: z.enum(['ok', 'low', 'critical']),
   sphereInsight: SphereInsightSchema,
   beliefCards: z.array(BeliefCardSchema),
-  strategy: z.object({ lead: StrategyProfileSchema, guides: z.array(InteractionGuideSchema) }),
+  strategy: z.object({
+    state: z.enum(['confident', 'mixed', 'none']),
+    lead: StrategyProfileSchema,
+    second: StrategyProfileSchema.nullable(),
+    guides: z.array(InteractionGuideSchema),
+  }),
 });
 export type RenderedResult = z.infer<typeof RenderedResultSchema>;
 

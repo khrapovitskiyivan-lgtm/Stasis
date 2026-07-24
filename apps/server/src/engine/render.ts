@@ -16,13 +16,18 @@ export function renderResult(p: Profile, content: ContentBundle): RenderedResult
   return {
     leadElement: p.leadElement,
     secondElement: p.secondElement ?? null,
-    isMixed: p.isMixed,
+    elementState: p.elementState,
     resourceState: p.resourceState,
     // p.weakArea is never undefined: computeProfile guards the empty-weakAreas
     // case (all spheres > 4) by falling back to the lowest sphere, mirroring
     // computeMiniInsight's lowestArea fallback.
     sphereInsight: content.sphereInsights[p.weakArea],
     beliefCards,
-    strategy: { lead: content.strategies[p.leadStrategy], guides },
+    strategy: {
+      state: p.strategyState,
+      lead: content.strategies[p.leadStrategy],
+      second: content.strategies[p.secondStrategy] ?? null,
+      guides,
+    },
   };
 }

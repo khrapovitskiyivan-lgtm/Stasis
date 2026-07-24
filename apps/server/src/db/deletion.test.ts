@@ -12,9 +12,9 @@ function seed(db: ReturnType<typeof openDb>) {
   const { id: userId } = users.upsertByTgId(4242, 'ivan', 'ru');
   const runs = runsRepo(db, ENC);
   const profile = {
-    leadElement: 'earth', secondElement: null, isMixed: false,
+    leadElement: 'earth', secondElement: null, elementState: 'confident',
     weakAreas: [], resourceState: 'ok', beliefCardIds: [],
-    leadStrategy: 'a', secondStrategy: null, isStrategyMixed: false, guideRefs: [],
+    leadStrategy: 'a', secondStrategy: null, strategyState: 'confident', guideRefs: [],
   } as any;
   const { profileId } = runs.saveRun(
     userId,

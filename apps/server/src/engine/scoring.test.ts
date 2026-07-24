@@ -48,6 +48,40 @@ describe('scoreStrategies', () => {
   });
 });
 
+describe('scoreStrategies determinacy', () => {
+  const STRAT_ITEMS: StrategyTestItem[] = [
+    ...[1, 2, 3, 4].map((id) => ({ id, loads: 'power', key: 'direct', situation: 's', statement: 's' } as StrategyTestItem)),
+    ...[5, 6, 7, 8].map((id) => ({ id, loads: 'attention', key: 'direct', situation: 's', statement: 's' } as StrategyTestItem)),
+    ...[9, 10, 11, 12].map((id) => ({ id, loads: 'superiority', key: 'direct', situation: 's', statement: 's' } as StrategyTestItem)),
+    ...[13, 14, 15, 16].map((id) => ({ id, loads: 'avoidance', key: 'direct', situation: 's', statement: 's' } as StrategyTestItem)),
+  ];
+  const answer = (id: number, value: number) => ({ itemId: `s${id}`, value });
+
+  it('confident: one strategy clearly above the others and above the floor', () => {
+    // avoidance items (13-16) = 6, everything else = 1
+    const answers = STRAT_ITEMS.map((i) => answer(i.id, i.loads === 'avoidance' ? 6 : 1));
+    const r = scoreStrategies(answers, STRAT_ITEMS);
+    expect(r.lead).toBe('avoidance');
+    expect(r.state).toBe('confident');
+  });
+
+  it('none: flat/low profile does NOT default to the first-listed strategy (power)', () => {
+    // everything low (2) → no lead clears the 3.5 floor
+    const answers = STRAT_ITEMS.map((i) => answer(i.id, 2));
+    const r = scoreStrategies(answers, STRAT_ITEMS);
+    expect(r.state).toBe('none');
+  });
+
+  it('mixed: two strategies both above the floor and within the gap', () => {
+    // power and avoidance both high (5), others low (1)
+    const answers = STRAT_ITEMS.map((i) =>
+      answer(i.id, i.loads === 'power' || i.loads === 'avoidance' ? 5 : 1)
+    );
+    const r = scoreStrategies(answers, STRAT_ITEMS);
+    expect(r.state).toBe('mixed');
+  });
+});
+
 describe('scoreResource', () => {
   const ritems = [
     { id: 'a', key: 'direct' as const, statement: '' },

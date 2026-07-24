@@ -25,9 +25,9 @@ export function runsRepo(db: Db, encKey: string) {
         enc(payload.strategyAnswers), enc(payload.resourceAnswers), now);
       const testRunId = Number(run.lastInsertRowid);
       const p = insProfile.run(testRunId, userId, profile.leadElement, profile.secondElement ?? null,
-        profile.isMixed ? 1 : 0, JSON.stringify(profile.weakAreas), profile.resourceState,
+        profile.elementState === 'mixed' ? 1 : 0, JSON.stringify(profile.weakAreas), profile.resourceState,
         JSON.stringify(profile.beliefCardIds), profile.leadStrategy, profile.secondStrategy ?? null,
-        profile.isStrategyMixed ? 1 : 0, JSON.stringify(profile.guideRefs), ENGINE_VERSION, contentVersion, now);
+        profile.strategyState === 'mixed' ? 1 : 0, JSON.stringify(profile.guideRefs), ENGINE_VERSION, contentVersion, now);
       return { profileId: Number(p.lastInsertRowid) };
     },
   };

@@ -1,14 +1,23 @@
 import { AREAS, ELEMENTS, STRATEGIES, type Area, type Element, type Strategy,
   type LikertAnswer, type WheelScores, type ElementItemMeta, type StrategyTestItem } from '@stasis/shared';
 
-const MIXED_GAP = 0.5;
+const DETERMINACY_FLOOR = 3.5; // lead must clear the 1–6 scale midpoint to count as endorsed
+const DETERMINACY_GAP = 0.5;   // min lead-over-second margin to read as a single confident type
 const val = (answers: LikertAnswer[], id: string) => answers.find((a) => a.itemId === id)?.value;
 const applied = (v: number, key: 'direct' | 'reverse') => (key === 'reverse' ? 7 - v : v);
+
+export type Determinacy = 'confident' | 'mixed' | 'none';
 
 function rank<T extends string>(scores: Record<T, number>, keys: readonly T[]) {
   const ordered = [...keys].sort((a, b) => scores[b] - scores[a]);
   const lead = ordered[0], second = ordered[1];
-  return { lead, second, isMixed: scores[lead] - scores[second] <= MIXED_GAP };
+  const state: Determinacy =
+    scores[lead] < DETERMINACY_FLOOR
+      ? 'none'
+      : scores[lead] - scores[second] <= DETERMINACY_GAP
+        ? 'mixed'
+        : 'confident';
+  return { lead, second, state };
 }
 
 function meanByGroup<T extends string>(

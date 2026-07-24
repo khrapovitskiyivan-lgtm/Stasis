@@ -28,9 +28,9 @@ export function computeProfile(
   // index with undefined; weakAreas (plural, capped at 3) stays as-is for belief cards.
   const weakArea = weak[0] ?? lowestArea(wheel);
   return {
-    leadElement: el.lead, secondElement: el.second, isMixed: el.isMixed,
+    leadElement: el.lead, secondElement: el.second, elementState: el.state,
     weakAreas: weak, weakArea, resourceState: state, beliefCardIds,
-    leadStrategy: st.lead, secondStrategy: st.second, isStrategyMixed: st.isMixed, guideRefs,
+    leadStrategy: st.lead, secondStrategy: st.second, strategyState: st.state, guideRefs,
   };
 }
 
