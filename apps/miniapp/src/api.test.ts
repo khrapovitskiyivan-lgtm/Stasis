@@ -12,7 +12,7 @@ const payload: SubmitPayload = {
 const validResult: RenderedResult = {
   leadElement: 'fire',
   secondElement: null,
-  isMixed: false,
+  elementState: 'confident',
   resourceState: 'ok',
   sphereInsight: {
     area: 'career',
@@ -22,7 +22,9 @@ const validResult: RenderedResult = {
   },
   beliefCards: [],
   strategy: {
+    state: 'confident',
     lead: { name: 'n', coreDrive: 'c', childhoodLogic: 'l', underStress: 'u', gift: 'g', cost: 'co', growthNudge: 'gn' },
+    second: null,
     guides: [],
   },
 };

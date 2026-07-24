@@ -43,14 +43,24 @@ export function ResultScreen({ result, onSignal, onShare, onTakeStep }: ResultSc
 
       <section className="result-section result-strength" aria-label="Сила">
         <h2 className="result-section-title">Сила</h2>
-        <p className="screen-text">
-          Твоя стихия — {ELEMENT_LABELS[result.leadElement]}. {ELEMENT_STRENGTH_COPY[result.leadElement]}
-        </p>
-        {result.isMixed && result.secondElement ? (
-          <p className="result-second-element">
-            Также заметен элемент: {ELEMENT_LABELS[result.secondElement]}.
+        {result.elementState === 'none' ? (
+          <p className="screen-text">
+            Ярко выраженной стихии не проявилось — ближе всего {ELEMENT_LABELS[result.leadElement]}
+            {result.secondElement ? ` и ${ELEMENT_LABELS[result.secondElement]}` : ''}, но некрепко. Это нормально.
           </p>
-        ) : null}
+        ) : result.elementState === 'mixed' && result.secondElement ? (
+          <>
+            <p className="screen-text">
+              Смешанный профиль: {ELEMENT_LABELS[result.leadElement]} и {ELEMENT_LABELS[result.secondElement]}.
+            </p>
+            <p className="screen-text">{ELEMENT_STRENGTH_COPY[result.leadElement]}</p>
+            <p className="screen-text">{ELEMENT_STRENGTH_COPY[result.secondElement]}</p>
+          </>
+        ) : (
+          <p className="screen-text">
+            Твоя стихия — {ELEMENT_LABELS[result.leadElement]}. {ELEMENT_STRENGTH_COPY[result.leadElement]}
+          </p>
+        )}
       </section>
 
       <div className="result-tone-toggle" role="group" aria-label="Тон подачи">
@@ -95,25 +105,44 @@ export function ResultScreen({ result, onSignal, onShare, onTakeStep }: ResultSc
         ))}
       </div>
 
-      <section className="result-section result-strategy" aria-label="Стратегия">
-        <h2 className="result-section-title">{result.strategy.lead.name}</h2>
-        <p className="screen-text">{result.strategy.lead.gift}</p>
-        <p className="screen-text">{result.strategy.lead.cost}</p>
-        <p className="screen-text result-growth-nudge">{result.strategy.lead.growthNudge}</p>
+      {result.strategy.state === 'none' ? (
+        <section className="result-section result-strategy" aria-label="Стратегия">
+          <h2 className="result-section-title">Стратегия под стрессом</h2>
+          <p className="screen-text">
+            Под стрессом выраженной стратегии не проявилось
+            {result.strategy.second
+              ? ` — иногда склоняешься к «${result.strategy.lead.name}» или «${result.strategy.second.name}», но некрепко.`
+              : '.'}
+          </p>
+        </section>
+      ) : (
+        <section className="result-section result-strategy" aria-label="Стратегия">
+          <h2 className="result-section-title">
+            {result.strategy.state === 'mixed' && result.strategy.second
+              ? `${result.strategy.lead.name} с оттенком ${result.strategy.second.name}`
+              : result.strategy.lead.name}
+          </h2>
+          <p className="screen-text">{result.strategy.lead.gift}</p>
+          <p className="screen-text">{result.strategy.lead.cost}</p>
+          <p className="screen-text result-growth-nudge">{result.strategy.lead.growthNudge}</p>
+          {result.strategy.state === 'mixed' && result.strategy.second ? (
+            <p className="screen-text">Оттенок «{result.strategy.second.name}»: {result.strategy.second.gift}</p>
+          ) : null}
 
-        <div className="result-guides">
-          {result.strategy.guides.map((guide, idx) => (
-            <div key={idx} className="result-guide">
-              <p className="result-guide-collision">{guide.collision}</p>
-              <ul className="result-guide-howto">
-                {guide.howTo.map((step, stepIdx) => (
-                  <li key={stepIdx}>{step}</li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </section>
+          <div className="result-guides">
+            {result.strategy.guides.map((guide, idx) => (
+              <div key={idx} className="result-guide">
+                <p className="result-guide-collision">{guide.collision}</p>
+                <ul className="result-guide-howto">
+                  {guide.howTo.map((step, stepIdx) => (
+                    <li key={stepIdx}>{step}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="result-feedback">
         <p className="screen-text">Насколько это похоже на тебя?</p>

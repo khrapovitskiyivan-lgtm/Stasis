@@ -8,7 +8,7 @@ function makeResult(overrides: Partial<RenderedResult> = {}): RenderedResult {
   return {
     leadElement: 'fire',
     secondElement: null,
-    isMixed: false,
+    elementState: 'confident',
     resourceState: 'ok',
     sphereInsight: {
       area: 'career',
@@ -53,6 +53,7 @@ function makeResult(overrides: Partial<RenderedResult> = {}): RenderedResult {
       },
     ],
     strategy: {
+      state: 'confident',
       lead: {
         name: 'Превосходство',
         coreDrive: 'Быть лучшим, компетентным',
@@ -62,6 +63,7 @@ function makeResult(overrides: Partial<RenderedResult> = {}): RenderedResult {
         cost: 'Трудно просить о помощи, перфекционизм',
         growthNudge: 'Попробуй один раз показать незавершённую работу.',
       },
+      second: null,
       guides: [
         {
           you: 'superiority',
@@ -198,6 +200,28 @@ describe('ResultScreen', () => {
     render(<ResultScreen result={makeResult({ resourceState: 'low' })} onSignal={vi.fn()} onShare={vi.fn()} onTakeStep={vi.fn()} />);
     expect(screen.getByRole('button', { name: /бережно/i })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /прямо/i })).toBeDisabled();
+  });
+
+  it('element "none" state hides the single-element claim and shows the honest message', () => {
+    render(<ResultScreen result={makeResult({ elementState: 'none', secondElement: 'water' })}
+      onSignal={vi.fn()} onShare={vi.fn()} onTakeStep={vi.fn()} />);
+    expect(screen.getByText(/ярко выраженной стихии не проявилось/i)).toBeInTheDocument();
+    expect(screen.queryByText(/твоя стихия —/i)).not.toBeInTheDocument();
+  });
+
+  it('strategy "none" state hides the profile and guides', () => {
+    const r = makeResult({ strategy: { state: 'none', lead: makeResult().strategy.lead, second: null, guides: [] } });
+    render(<ResultScreen result={r} onSignal={vi.fn()} onShare={vi.fn()} onTakeStep={vi.fn()} />);
+    expect(screen.getByText(/выраженной стратегии не проявилось/i)).toBeInTheDocument();
+    expect(screen.queryByText(r.strategy.lead.gift)).not.toBeInTheDocument();
+  });
+
+  it('strategy "mixed" names the lead with a secondary tint', () => {
+    const base = makeResult();
+    const r = makeResult({ strategy: { state: 'mixed', lead: base.strategy.lead,
+      second: { ...base.strategy.lead, name: 'Уклонение' }, guides: base.strategy.guides } });
+    render(<ResultScreen result={r} onSignal={vi.fn()} onShare={vi.fn()} onTakeStep={vi.fn()} />);
+    expect(screen.getByText(/с оттенком Уклонение/i)).toBeInTheDocument();
   });
 });
 

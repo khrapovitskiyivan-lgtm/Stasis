@@ -15,7 +15,7 @@ const fixtureAssessment: Assessment = {
 const fixtureResult: RenderedResult = {
   leadElement: 'fire',
   secondElement: null,
-  isMixed: false,
+  elementState: 'confident',
   resourceState: 'ok',
   sphereInsight: {
     area: 'career',
@@ -40,7 +40,9 @@ const fixtureResult: RenderedResult = {
     },
   ],
   strategy: {
+    state: 'confident',
     lead: { name: 'Превосходство', coreDrive: 'c', childhoodLogic: 'l', underStress: 'u', gift: 'g', cost: 'co', growthNudge: 'gn' },
+    second: null,
     guides: [],
   },
 };
