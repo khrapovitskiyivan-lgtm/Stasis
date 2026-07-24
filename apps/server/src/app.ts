@@ -255,8 +255,18 @@ export function buildApp(deps: {
     // route the React Mini App router owns, so it gets index.html instead.
     const API_PREFIXES = ['/auth', '/me', '/submit', '/assessment', '/signal', '/consent', '/share', '/followup', '/webhook', '/health'];
     app.setNotFoundHandler((req, reply) => {
+      const path = req.url.split('?')[0];
       const isApiPath = API_PREFIXES.some((p) => req.url === p || req.url.startsWith(p + '/') || req.url.startsWith(p + '?'));
-      if (req.method === 'GET' && !isApiPath) {
+      // A request that looks like a static file (has an extension, e.g. a
+      // content-hashed /assets/*.js) but reached here means the file is absent —
+      // return a real 404, NOT index.html. Serving HTML under a .js URL makes the
+      // browser refuse the module ("wrong MIME") and the app renders blank; worse,
+      // that bad 200 gets cached. Only extensionless GETs are SPA client routes.
+      const looksLikeAsset = /\.[a-zA-Z0-9]+$/.test(path);
+      if (req.method === 'GET' && !isApiPath && !looksLikeAsset) {
+        // index.html must never be cached: it's the shell that points at the
+        // current hashed bundle, so a stale copy would pin an old/bad asset URL.
+        reply.header('cache-control', 'no-cache');
         return reply.sendFile('index.html', miniappDist);
       }
       return reply.code(404).send({ error: 'not_found' });
