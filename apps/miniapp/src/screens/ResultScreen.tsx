@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import type { BeliefCard as BeliefCardData, Element, RenderedResult } from '@stasis/shared';
+import type { BeliefCard as BeliefCardData, Element, RenderedResult, Strategy } from '@stasis/shared';
+import { ELEMENTS, STRATEGIES } from '@stasis/shared';
 import { BeliefCard } from '../components/BeliefCard.js';
 import { SAFETY_TEXT } from '../safety.js';
+import { TypologyProbe } from '../components/TypologyProbe.js';
 
 export interface ResultScreenProps {
   result: RenderedResult;
@@ -10,13 +11,18 @@ export interface ResultScreenProps {
   onTakeStep: (card: BeliefCardData) => void;
 }
 
-type Tone = 'gentle' | 'direct';
-
 const ELEMENT_LABELS: Record<Element, string> = {
   fire: 'Огонь',
   water: 'Вода',
   air: 'Воздух',
   earth: 'Земля',
+};
+
+const STRATEGY_LABELS: Record<Strategy, string> = {
+  power: 'Власть',
+  attention: 'Внимание',
+  superiority: 'Превосходство',
+  avoidance: 'Уклонение',
 };
 
 const ELEMENT_STRENGTH_COPY: Record<Element, string> = {
@@ -33,12 +39,8 @@ const RESOURCE_STATE_COPY: Record<RenderedResult['resourceState'], string> = {
 };
 
 export function ResultScreen({ result, onSignal, onShare, onTakeStep }: ResultScreenProps) {
-  const [tone, setTone] = useState<Tone>('gentle');
-  const toneLocked = result.resourceState !== 'ok';
-  const effectiveTone: Tone = toneLocked ? 'gentle' : tone;
-
   return (
-    <div className={`screen result-screen result-tone-${effectiveTone}`}>
+    <div className="screen result-screen">
       <h1 className="screen-title">Твой результат</h1>
 
       <section className="result-section result-strength" aria-label="Сила">
@@ -63,25 +65,15 @@ export function ResultScreen({ result, onSignal, onShare, onTakeStep }: ResultSc
         )}
       </section>
 
-      <div className="result-tone-toggle" role="group" aria-label="Тон подачи">
-        <button
-          type="button"
-          aria-pressed={effectiveTone === 'gentle'}
-          className={`result-tone-option${effectiveTone === 'gentle' ? ' result-tone-option-selected' : ''}`}
-          onClick={() => setTone('gentle')}
-        >
-          Бережно
-        </button>
-        <button
-          type="button"
-          aria-pressed={effectiveTone === 'direct'}
-          disabled={toneLocked}
-          className={`result-tone-option${effectiveTone === 'direct' ? ' result-tone-option-selected' : ''}`}
-          onClick={() => setTone('direct')}
-        >
-          Прямо
-        </button>
-      </div>
+      {result.elementState !== 'confident' ? (
+        <TypologyProbe
+          axisLabel="Стихия"
+          options={ELEMENTS.map((e) => ({ value: e, label: ELEMENT_LABELS[e] }))}
+          onReport={(selfReport) =>
+            onSignal('typology_self_report', { axis: 'element', measured: result.elementState, selfReport })
+          }
+        />
+      ) : null}
 
       <section className="result-section result-state" aria-label="Состояние">
         <h2 className="result-section-title">Состояние</h2>
@@ -143,6 +135,16 @@ export function ResultScreen({ result, onSignal, onShare, onTakeStep }: ResultSc
           </div>
         </section>
       )}
+
+      {result.strategy.state !== 'confident' ? (
+        <TypologyProbe
+          axisLabel="Стратегия"
+          options={STRATEGIES.map((s) => ({ value: s, label: STRATEGY_LABELS[s] }))}
+          onReport={(selfReport) =>
+            onSignal('typology_self_report', { axis: 'strategy', measured: result.strategy.state, selfReport })
+          }
+        />
+      ) : null}
 
       <div className="result-feedback">
         <p className="screen-text">Насколько это похоже на тебя?</p>

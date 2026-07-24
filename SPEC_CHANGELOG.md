@@ -6,6 +6,12 @@ Reference spec: `docs/superpowers/specs/2026-07-22-stasis-solo-mvp-design.md`.
 
 ---
 
+## 2026-07-25 — ResultScreen: self-report probe + tone-toggle removal
+- Added `TypologyProbe`: a per-axis one-tap self-report shown only when an axis is `none`/`mixed` (element and strategy judged independently). Fires analytics-only `onSignal('typology_self_report', { axis, measured, selfReport∈{balanced|type-key} })`; never overrides the measured result. The «Выраженной нет — я гибкий(ая)» option is first-class. Rationale: cheap signal-vs-noise data before considering adaptive items (per the psychometrics consult).
+- Removed the non-functional «Бережно/Прямо» tone toggle (it only restyled a border, never changed copy) and its dead CSS/tests.
+
+---
+
 ## 2026-07-24 — Typology determinacy gate (Task 1, server): `profiles.is_mixed`/`is_strategy_mixed` become floor-aware
 
 - **Engine now emits a three-state `Determinacy` (`'confident' | 'mixed' | 'none'`) per axis instead of a binary "mixed" flag.** `rank()` (`apps/server/src/engine/scoring.ts`) first checks the lead score clears a `DETERMINACY_FLOOR` (3.5, the 1–6 scale midpoint) — below it, the profile is `'none'` (nothing endorsed clearly enough to call a lead at all), not a forced pick of the first-listed element/strategy. Only above the floor does the old lead-minus-second `DETERMINACY_GAP` (0.5) distinguish `'confident'` from `'mixed'`. Threaded through `computeProfile` (`elementState`/`strategyState`, replacing `isMixed`/`isStrategyMixed`), `renderResult` (`RenderedResult.elementState`, `RenderedResult.strategy.state`), and the `RenderedResultSchema` contract in `packages/shared/src/schemas.ts`.

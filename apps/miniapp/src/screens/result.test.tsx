@@ -190,16 +190,51 @@ describe('ResultScreen', () => {
     expect(screen.getByText(/если сейчас тяжело/i)).toBeInTheDocument();
   });
 
-  it('defaults tone to "Бережно" and allows "Прямо" when resourceState is "ok"', () => {
-    render(<ResultScreen result={makeResult({ resourceState: 'ok' })} onSignal={vi.fn()} onShare={vi.fn()} onTakeStep={vi.fn()} />);
-    expect(screen.getByRole('button', { name: /бережно/i })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: /прямо/i })).not.toBeDisabled();
+  it('has no tone toggle (Бережно/Прямо removed)', () => {
+    render(<ResultScreen result={makeResult()} onSignal={vi.fn()} onShare={vi.fn()} onTakeStep={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: /бережно/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^прямо$/i })).not.toBeInTheDocument();
   });
 
-  it('forces and disables "Прямо" tone when resourceState is not "ok"', () => {
-    render(<ResultScreen result={makeResult({ resourceState: 'low' })} onSignal={vi.fn()} onShare={vi.fn()} onTakeStep={vi.fn()} />);
-    expect(screen.getByRole('button', { name: /бережно/i })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: /прямо/i })).toBeDisabled();
+  it('shows no self-report probe when both axes are confident', () => {
+    render(<ResultScreen result={makeResult()} onSignal={vi.fn()} onShare={vi.fn()} onTakeStep={vi.fn()} />);
+    expect(screen.queryByText(/а как тебе самому кажется/i)).not.toBeInTheDocument();
+  });
+
+  it('element probe: "balanced" fires typology_self_report for the element axis', () => {
+    const onSignal = vi.fn();
+    render(<ResultScreen result={makeResult({ elementState: 'none', secondElement: 'water' })}
+      onSignal={onSignal} onShare={vi.fn()} onTakeStep={vi.fn()} />);
+    const probe = screen.getByRole('group', { name: /самоотчёт: стихия/i });
+    fireEvent.click(within(probe).getByRole('button', { name: /выраженной нет/i }));
+    expect(onSignal).toHaveBeenCalledWith('typology_self_report', {
+      axis: 'element', measured: 'none', selfReport: 'balanced',
+    });
+  });
+
+  it('element probe: choosing a chip fires the element key', () => {
+    const onSignal = vi.fn();
+    render(<ResultScreen result={makeResult({ elementState: 'mixed', secondElement: 'water' })}
+      onSignal={onSignal} onShare={vi.fn()} onTakeStep={vi.fn()} />);
+    const probe = screen.getByRole('group', { name: /самоотчёт: стихия/i });
+    fireEvent.click(within(probe).getByRole('button', { name: /я скорее одна/i }));
+    fireEvent.click(within(probe).getByRole('button', { name: /^вода$/i }));
+    expect(onSignal).toHaveBeenCalledWith('typology_self_report', {
+      axis: 'element', measured: 'mixed', selfReport: 'water',
+    });
+  });
+
+  it('strategy probe: fires typology_self_report for the strategy axis', () => {
+    const onSignal = vi.fn();
+    const base = makeResult();
+    const r = makeResult({ strategy: { state: 'none', lead: base.strategy.lead, second: null, guides: [] } });
+    render(<ResultScreen result={r} onSignal={onSignal} onShare={vi.fn()} onTakeStep={vi.fn()} />);
+    const probe = screen.getByRole('group', { name: /самоотчёт: стратегия/i });
+    fireEvent.click(within(probe).getByRole('button', { name: /я скорее одна/i }));
+    fireEvent.click(within(probe).getByRole('button', { name: /^уклонение$/i }));
+    expect(onSignal).toHaveBeenCalledWith('typology_self_report', {
+      axis: 'strategy', measured: 'none', selfReport: 'avoidance',
+    });
   });
 
   it('element "none" state hides the single-element claim and shows the honest message', () => {
