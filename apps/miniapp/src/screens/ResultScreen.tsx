@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { BeliefCard as BeliefCardData, Element, RenderedResult } from '@stasis/shared';
 import { BeliefCard } from '../components/BeliefCard.js';
+import { SAFETY_TEXT } from '../safety.js';
 
 export interface ResultScreenProps {
   result: RenderedResult;
@@ -30,9 +31,6 @@ const RESOURCE_STATE_COPY: Record<RenderedResult['resourceState'], string> = {
   low: 'Ресурс сейчас снижен — двигайся маленькими шагами.',
   critical: 'Ресурс сейчас на нуле — сегодня важнее забота о себе, чем прогресс.',
 };
-
-const SAFETY_TEXT =
-  'Если сейчас тяжело — вы можете обратиться за поддержкой к специалисту или на линию психологической помощи.';
 
 export function ResultScreen({ result, onSignal, onShare, onTakeStep }: ResultScreenProps) {
   const [tone, setTone] = useState<Tone>('gentle');

@@ -1,4 +1,5 @@
 import type { RenderedResult, SphereInsight } from '@stasis/shared';
+import { SAFETY_TEXT } from '../safety.js';
 
 export interface MiniInsightScreenProps {
   sphereInsight: SphereInsight;
@@ -6,9 +7,6 @@ export interface MiniInsightScreenProps {
   onDeepen: () => void;
   onShare: () => void;
 }
-
-const SAFETY_TEXT =
-  'Если сейчас тяжело — вы можете обратиться за поддержкой к специалисту или на линию психологической помощи.';
 
 export function MiniInsightScreen({
   sphereInsight,

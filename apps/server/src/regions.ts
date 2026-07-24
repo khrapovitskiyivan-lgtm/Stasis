@@ -4,12 +4,12 @@
 export const REGIONS = {
   ru: {
     dataResidency: 'Russia (RU)',
-    // NO real phone number here on purpose: a real-but-wrong-scope line could
-    // route an adult in crisis to the wrong service. Confirm the correct adult
-    // crisis line with a professional and replace the placeholder BEFORE launch
-    // (tracked as a pre-launch checklist item, not just this comment).
+    // Official, government-operated line — verified against the МЧС source
+    // (psi.mchs.gov.ru): all-Russia, 24/7, free, anonymous, for adults. Chosen
+    // over NGO hotlines (which can quietly go defunct) so the number stays valid.
+    // 112 added for immediate danger to life. Re-verify before the full pilot.
     crisisSupport:
-      'Если сейчас тяжело, вы можете обратиться за поддержкой к специалисту или на линию психологической помощи. [TODO до запуска: подставить подтверждённый телефон доверия для взрослых.]',
+      'Если сейчас тяжело, вы можете бесплатно и анонимно обратиться за поддержкой: круглосуточная линия экстренной психологической помощи МЧС России — +7 (495) 989-50-50. Если есть угроза жизни, звоните 112.',
   },
   eu: {
     dataResidency: 'European Union (EU)',
