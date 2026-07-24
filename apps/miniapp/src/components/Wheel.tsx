@@ -7,6 +7,15 @@ export interface WheelProps {
   ariaLabel?: string;
 }
 
+const AREA_LABELS: Record<Area, string> = {
+  health: 'Здоровье',
+  family: 'Семья',
+  rest: 'Отдых',
+  friends: 'Друзья',
+  career: 'Карьера',
+  hobby: 'Увлечения',
+};
+
 const MIN = 1;
 const MAX = 10;
 const DEFAULT_VALUE = 5;
@@ -76,7 +85,7 @@ export function Wheel({ values, onChange, ariaLabel }: WheelProps) {
       <div className="wheel-controls">
         {AREAS.map((area) => (
           <label key={area} className="wheel-control">
-            <span className="wheel-control-label">{area}</span>
+            <span className="wheel-control-label">{AREA_LABELS[area]}</span>
             <input
               type="range"
               className="wheel-control-range"
@@ -84,7 +93,7 @@ export function Wheel({ values, onChange, ariaLabel }: WheelProps) {
               max={MAX}
               step={1}
               value={values[area] ?? DEFAULT_VALUE}
-              aria-label={area}
+              aria-label={AREA_LABELS[area]}
               onChange={(e) => onChange(area, Number(e.target.value))}
             />
             <span className="wheel-control-value">{values[area] ?? DEFAULT_VALUE}</span>

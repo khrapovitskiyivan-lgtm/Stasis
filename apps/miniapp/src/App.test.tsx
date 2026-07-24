@@ -78,11 +78,11 @@ async function driveToResult() {
   fireEvent.click(screen.getByRole('button', { name: /продолжить/i }));
   // intro
   fireEvent.click(await screen.findByRole('button', { name: /начать/i }));
-  // wheel: set all 6 areas to 7 (not the default 5, so onChange fires)
-  await screen.findByRole('slider', { name: 'health' });
-  for (const area of AREAS) {
-    fireEvent.change(screen.getByRole('slider', { name: area }), { target: { value: '7' } });
-  }
+  // wheel: set all 6 areas to 7 (not the default 5, so onChange fires).
+  // Query sliders by position, not by accessible name, so the labels can be
+  // localized (RU) without coupling the flow test to their text.
+  const sliders = await screen.findAllByRole('slider');
+  AREAS.forEach((_, i) => fireEvent.change(sliders[i], { target: { value: '7' } }));
   fireEvent.click(screen.getByRole('button', { name: /продолжить/i }));
   // resource
   await screen.findByText(fixtureAssessment.resourceItems[0].statement);
@@ -177,13 +177,13 @@ describe('App flow smoke test', () => {
 
     fireEvent.click(startButton);
     // still gated: the wheel screen never mounts while assessment is null
-    expect(screen.queryByRole('slider', { name: 'health' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('slider', { name: /здоровье/i })).not.toBeInTheDocument();
 
     resolveAssessment(fixtureAssessment);
     await waitFor(() => expect(startButton).not.toBeDisabled());
 
     fireEvent.click(startButton);
-    expect(await screen.findByRole('slider', { name: 'health' })).toBeInTheDocument();
+    expect(await screen.findByRole('slider', { name: /здоровье/i })).toBeInTheDocument();
   });
 
   it('does not auto-retry submit on failure; retries only on explicit user action', async () => {

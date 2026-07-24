@@ -35,7 +35,7 @@ describe('WheelScreen', () => {
   it('dispatches setWheel when a Wheel slider changes', () => {
     const dispatch = vi.fn();
     render(<WheelScreen state={initialFlow} dispatch={dispatch} />);
-    const slider = screen.getByRole('slider', { name: /health/i });
+    const slider = screen.getByRole('slider', { name: /здоровье/i });
     fireEvent.change(slider, { target: { value: '8' } });
     expect(dispatch).toHaveBeenCalledWith({ type: 'setWheel', area: 'health', value: 8 });
   });
