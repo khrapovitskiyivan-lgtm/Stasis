@@ -5,6 +5,11 @@ export function initTelegram(): TgContext {
   if (wa?.initData) {
     wa.ready?.();
     wa.expand?.();
+    // Paint the Telegram header/background to match the app's --color-bg so
+    // fullscreen has no white flash or mismatched bar. Hex mirrors theme.css.
+    const bg = wa.colorScheme === 'dark' ? '#17181a' : '#f7f5f1';
+    try { wa.setBackgroundColor?.(bg); } catch { /* pre-6.9 client */ }
+    try { wa.setHeaderColor?.(bg); } catch { /* pre-6.9 client */ }
     // App-like fullscreen mobile mode (Bot API 8.0+). Each call is guarded:
     // older clients and Telegram Desktop lack these methods (or throw
     // "unsupported"), and bootstrap must never break — there we just keep the
