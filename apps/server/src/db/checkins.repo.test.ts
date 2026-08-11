@@ -23,9 +23,15 @@ describe('checkinsRepo', () => {
     expect(rows[0].stepOutcome).toBe('partial');
     expect(rows[0].note).toBe('секрет');
     // note is encrypted at rest, not plaintext
-    const raw = db.prepare('SELECT note, step_outcome FROM checkins WHERE id=?').get(rows[0].id) as any;
+    const raw = db.prepare('SELECT note, step_outcome, wheel_scores, energy FROM checkins WHERE id=?').get(rows[0].id) as any;
     expect(raw.note).not.toContain('секрет');
     expect(raw.step_outcome).toBe('partial');
+    // wheel_scores and energy must be stored in encryptField ciphertext format (iv:tag:ct hex
+    // triple), not plaintext JSON — a substring check would be flaky here (e.g. energy `4`
+    // collides with hex digits in the ciphertext), so assert the format instead.
+    const encFmt = /^[0-9a-f]+:[0-9a-f]+:[0-9a-f]+$/;
+    expect(raw.wheel_scores).toMatch(encFmt);
+    expect(raw.energy).toMatch(encFmt);
   });
 
   it('history is ascending by created_at', () => {
