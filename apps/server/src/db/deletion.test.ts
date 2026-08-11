@@ -3,7 +3,8 @@ import { openDb } from './connection.js';
 import { usersRepo } from './users.repo.js';
 import { runsRepo } from './runs.repo.js';
 import { consentsRepo } from './consents.repo.js';
-import { deleteUserData } from './deletion.js';
+import { deleteUserData, CHILD_TABLES } from './deletion.js';
+import { runMigrations } from './migrate.js';
 
 const ENC = 'a'.repeat(64);
 
@@ -65,5 +66,26 @@ describe('deleteUserData', () => {
   it('is a no-op for an unknown tg user id', () => {
     const db = openDb(':memory:');
     expect(() => deleteUserData(db, 999999)).not.toThrow();
+  });
+
+  it('CHILD_TABLES covers every table that has a user_id column (no silent PDn leak)', () => {
+    const db = openDb(':memory:');
+    runMigrations(db);
+    const tables = (db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`).all() as { name: string }[])
+      .map((t) => t.name)
+      .filter((name) => (db.prepare(`PRAGMA table_info(${name})`).all() as { name: string }[]).some((c) => c.name === 'user_id'));
+    for (const t of tables) expect(CHILD_TABLES as readonly string[]).toContain(t);
+  });
+
+  it('deletes checkins before follow_ups without FK rollback', () => {
+    const db = openDb(':memory:');
+    runMigrations(db);
+    const now = Date.now();
+    db.prepare('INSERT INTO users (tg_user_id, created_at) VALUES (?, ?)').run(555, now);
+    const uid = (db.prepare('SELECT id FROM users WHERE tg_user_id=?').get(555) as { id: number }).id;
+    db.prepare('INSERT INTO checkins (user_id, created_at, wheel_scores, energy, step_outcome) VALUES (?,?,?,?,?)')
+      .run(uid, now, 'enc', 'enc', 'done');
+    deleteUserData(db, 555);
+    expect((db.prepare('SELECT COUNT(*) c FROM checkins WHERE user_id=?').get(uid) as any).c).toBe(0);
   });
 });

@@ -5,7 +5,7 @@ import type { Db } from './connection.js';
 // points at. shares.profile_id -> profiles(id) and profiles.test_run_id ->
 // test_runs(id), so the order is shares -> profiles -> test_runs. Missing tables
 // are skipped via an existence check.
-const CHILD_TABLES = ['shares', 'profiles', 'test_runs', 'consents', 'signals', 'follow_ups'] as const;
+export const CHILD_TABLES = ['shares', 'profiles', 'test_runs', 'checkins', 'consents', 'signals', 'follow_ups'] as const;
 
 function tableExists(db: Db, name: string): boolean {
   const row = db.prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`).get(name);

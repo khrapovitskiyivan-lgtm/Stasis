@@ -84,6 +84,29 @@ const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    version: 3,
+    up(db: Db): void {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS checkins (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL REFERENCES users(id),
+          created_at INTEGER NOT NULL,
+          wheel_scores TEXT NOT NULL,
+          energy TEXT NOT NULL,
+          step_ref INTEGER,
+          step_outcome TEXT,
+          note TEXT
+        );
+      `);
+      const cols = db.prepare('PRAGMA table_info(follow_ups)').all() as { name: string }[];
+      if (!cols.some((c) => c.name === 'kind')) {
+        db.exec(`ALTER TABLE follow_ups ADD COLUMN kind TEXT NOT NULL DEFAULT 'step';`);
+      }
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_checkins_user ON checkins(user_id);`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_follow_ups_due ON follow_ups(due_at) WHERE sent_at IS NULL;`);
+    },
+  },
 ];
 
 export function runMigrations(db: Db): void {
