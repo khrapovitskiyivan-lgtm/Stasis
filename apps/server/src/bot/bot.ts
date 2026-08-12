@@ -39,7 +39,12 @@ export function buildBot(deps: { botToken: string; miniappUrl: string; db: Db; e
         // A callback answer can't itself launch a Mini App with an arbitrary
         // URL (Telegram only allows game/t.me URLs there) — same as /start,
         // send a fresh message with a web_app inline button to open the app.
-        const keyboard = new InlineKeyboard().webApp('Открыть чек-ин', deps.miniappUrl);
+        // The Mini App detects check-in mode via a `?mode=checkin` URL query
+        // (apps/miniapp/src/telegram.ts getEntryMode()) — without it the app
+        // would land on onboarding instead of the check-in.
+        const separator = deps.miniappUrl.includes('?') ? '&' : '?';
+        const checkinUrl = `${deps.miniappUrl}${separator}mode=checkin`;
+        const keyboard = new InlineKeyboard().webApp('Открыть чек-ин', checkinUrl);
         await ctx.reply('Открываю чек-ин', { reply_markup: keyboard });
         return ctx.answerCallbackQuery();
       }

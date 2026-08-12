@@ -100,6 +100,7 @@ describe('DigestScreen', () => {
     expect(screen.getByText(SAFETY_TEXT)).toBeInTheDocument();
     expect(screen.queryByText(/не получилось/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/карьер/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /продолжить|меньше|новый шаг/i })).not.toBeInTheDocument();
   });
 
   it('calls onDone when the finish button is clicked', () => {

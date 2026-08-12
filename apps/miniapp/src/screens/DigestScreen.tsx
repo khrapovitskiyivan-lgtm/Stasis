@@ -74,12 +74,14 @@ export function DigestScreen({ digest, onDone }: DigestScreenProps) {
         </div>
       )}
 
-      <section className="digest-next-step" aria-label="Дальше">
-        <p className="screen-text">{next.title}</p>
-        <button type="button" className="btn-continue" onClick={onDone}>
-          {next.cta}
-        </button>
-      </section>
+      {!digest.safety && (
+        <section className="digest-next-step" aria-label="Дальше">
+          <p className="screen-text">{next.title}</p>
+          <button type="button" className="btn-continue" onClick={onDone}>
+            {next.cta}
+          </button>
+        </section>
+      )}
     </div>
   );
 }

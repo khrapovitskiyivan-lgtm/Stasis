@@ -114,7 +114,42 @@ describe('buildBot', () => {
     const sendCalls = captured.filter((c) => c.method === 'sendMessage');
     expect(sendCalls.length).toBe(1);
     const buttons = sendCalls[0]!.payload.reply_markup.inline_keyboard.flat();
-    expect(buttons[0].web_app.url).toBe(MINIAPP_URL);
+    expect(buttons[0].web_app.url).toBe(`${MINIAPP_URL}?mode=checkin`);
     expect(captured.some((c) => c.method === 'answerCallbackQuery')).toBe(true);
+  });
+
+  it('a checkin nudge open button appends mode=checkin with & when the miniapp URL already has a query string', async () => {
+    const db = openDb(':memory:');
+    const urlWithQuery = 'https://miniapp.example.com/?ref=nudge';
+    const bot = buildBot({ botToken: BOT_TOKEN, miniappUrl: urlWithQuery, db, encKey: ENC });
+    bot.botInfo = BOT_INFO;
+    const captured: { method: string; payload: any }[] = [];
+    bot.api.config.use((_prev, method, payload) => {
+      captured.push({ method, payload });
+      return Promise.resolve({ ok: true, result: {} }) as any;
+    });
+
+    await bot.handleUpdate({
+      update_id: 5,
+      callback_query: {
+        id: 'cq3', chat_instance: 'ci',
+        from: { id: 4242, is_bot: false, first_name: 'Ivan' },
+        message: { message_id: 11, date: Math.floor(Date.now() / 1000), chat: { id: 4242, type: 'private' }, from: BOT_INFO },
+        data: 'checkin:8:open',
+      },
+    } as any);
+
+    const sendCalls = captured.filter((c) => c.method === 'sendMessage');
+    const buttons = sendCalls[0]!.payload.reply_markup.inline_keyboard.flat();
+    expect(buttons[0].web_app.url).toBe(`${urlWithQuery}&mode=checkin`);
+  });
+
+  it('the /start web_app button does NOT carry mode=checkin', async () => {
+    const { bot, captured } = buildTestBot();
+    await bot.handleUpdate(fakeUpdate(6, { text: '/start', entities: [{ type: 'bot_command', offset: 0, length: 6 }] }));
+
+    const sendCalls = captured.filter((c) => c.method === 'sendMessage');
+    const buttons = sendCalls[0]!.payload.reply_markup.inline_keyboard.flat();
+    expect(buttons[0].web_app.url).toBe(MINIAPP_URL);
   });
 });
