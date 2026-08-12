@@ -29,6 +29,9 @@ export function followUpsRepo(db: Db, encKey: string) {
     `UPDATE follow_ups SET unsubscribed = 1 WHERE user_id = ? AND sent_at IS NULL`
   );
   const recordReplyStmt = db.prepare(`UPDATE follow_ups SET response = ? WHERE id = ?`);
+  const selectLatestStep = db.prepare(
+    `SELECT card_ref, step_text FROM follow_ups WHERE user_id = ? AND kind = 'step' ORDER BY created_at DESC LIMIT 1`
+  );
 
   const map = (r: any): FollowUpRow => ({
     id: r.id,
@@ -67,6 +70,14 @@ export function followUpsRepo(db: Db, encKey: string) {
     },
     recordReply(id: number, reply: string): void {
       recordReplyStmt.run(reply, id);
+    },
+    // Most recently scheduled "step" nudge for a user (memory anchor for GET
+    // /checkin) — null if none. Deliberately not the `due`/`sent` state: the
+    // step itself, regardless of whether its reminder already fired.
+    latestStep(userId: number): { text: string; cardRef: string } | null {
+      const row = selectLatestStep.get(userId) as { card_ref: string; step_text: string } | undefined;
+      if (!row) return null;
+      return { text: decryptField(row.step_text, encKey), cardRef: row.card_ref };
     },
   };
 }

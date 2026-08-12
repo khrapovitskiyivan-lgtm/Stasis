@@ -1,6 +1,6 @@
 import type { Db } from './connection.js';
-import { encryptField } from '../crypto/field.js';
-import type { SubmitPayload } from '@stasis/shared';
+import { encryptField, decryptField } from '../crypto/field.js';
+import type { SubmitPayload, WheelScores } from '@stasis/shared';
 import type { computeProfile } from '../engine/index.js';
 
 export const ENGINE_VERSION = '2.0.0';
@@ -16,6 +16,9 @@ export function runsRepo(db: Db, encKey: string) {
      belief_card_ids, lead_strategy, second_strategy, is_strategy_mixed, guide_refs,
      engine_version, content_version, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  const selWheelHistory = db.prepare(
+    `SELECT wheel_scores, created_at FROM test_runs WHERE user_id = ? ORDER BY created_at ASC`
+  );
 
   return {
     saveRun(userId: number, payload: SubmitPayload, profile: Profile, contentVersion: string): { profileId: number } {
@@ -31,6 +34,14 @@ export function runsRepo(db: Db, encKey: string) {
         JSON.stringify(profile.beliefCardIds), profile.leadStrategy, profile.secondStrategy ?? null,
         profile.strategyState !== 'confident' ? 1 : 0, JSON.stringify(profile.guideRefs), ENGINE_VERSION, contentVersion, now);
       return { profileId: Number(p.lastInsertRowid) };
+    },
+    // Ascending onboarding/retake wheel snapshots for a user — the digest
+    // engine's baseline series (checkins layer on top of this).
+    wheelHistory(userId: number): { createdAt: number; wheel: WheelScores }[] {
+      return (selWheelHistory.all(userId) as any[]).map((r) => ({
+        createdAt: r.created_at,
+        wheel: JSON.parse(decryptField(r.wheel_scores, encKey)) as WheelScores,
+      }));
     },
   };
 }

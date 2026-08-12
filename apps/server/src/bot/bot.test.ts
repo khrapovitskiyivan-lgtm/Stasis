@@ -97,4 +97,24 @@ describe('buildBot', () => {
     expect(row.response).toBe('done');
     expect(captured.some((c) => c.method === 'answerCallbackQuery')).toBe(true);
   });
+
+  it('a checkin nudge open button sends a web_app button opening the miniapp URL', async () => {
+    const { bot, captured } = buildTestBot();
+
+    await bot.handleUpdate({
+      update_id: 4,
+      callback_query: {
+        id: 'cq2', chat_instance: 'ci',
+        from: { id: 4242, is_bot: false, first_name: 'Ivan' },
+        message: { message_id: 10, date: Math.floor(Date.now() / 1000), chat: { id: 4242, type: 'private' }, from: BOT_INFO },
+        data: 'checkin:7:open',
+      },
+    } as any);
+
+    const sendCalls = captured.filter((c) => c.method === 'sendMessage');
+    expect(sendCalls.length).toBe(1);
+    const buttons = sendCalls[0]!.payload.reply_markup.inline_keyboard.flat();
+    expect(buttons[0].web_app.url).toBe(MINIAPP_URL);
+    expect(captured.some((c) => c.method === 'answerCallbackQuery')).toBe(true);
+  });
 });

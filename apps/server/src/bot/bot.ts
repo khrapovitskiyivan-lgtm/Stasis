@@ -22,15 +22,29 @@ export function buildBot(deps: { botToken: string; miniappUrl: string; db: Db; e
     await ctx.reply('Ваши данные удалены.');
   });
 
-  // Follow-up nudge reply buttons (callback_data = `followup:<id>:<done|partial|failed>`).
+  // Follow-up nudge reply buttons (callback_data = `followup:<id>:<done|partial|failed>`)
+  // and the check-in nudge's open button (callback_data = `checkin:<id>:open`).
   // Wired only when an encryption key is available (needed to build the repo).
   if (deps.encKey) {
     const followUps = followUpsRepo(deps.db, deps.encKey);
     bot.on('callback_query:data', async (ctx) => {
-      const m = /^followup:(\d+):(done|partial|failed)$/.exec(ctx.callbackQuery.data);
-      if (!m) return ctx.answerCallbackQuery();
-      followUps.recordReply(Number(m[1]), m[2]);
-      return ctx.answerCallbackQuery({ text: 'Спасибо, записал.' });
+      const followUpMatch = /^followup:(\d+):(done|partial|failed)$/.exec(ctx.callbackQuery.data);
+      if (followUpMatch) {
+        followUps.recordReply(Number(followUpMatch[1]), followUpMatch[2]);
+        return ctx.answerCallbackQuery({ text: 'Спасибо, записал.' });
+      }
+
+      const checkinMatch = /^checkin:(\d+):open$/.exec(ctx.callbackQuery.data);
+      if (checkinMatch) {
+        // A callback answer can't itself launch a Mini App with an arbitrary
+        // URL (Telegram only allows game/t.me URLs there) — same as /start,
+        // send a fresh message with a web_app inline button to open the app.
+        const keyboard = new InlineKeyboard().webApp('Открыть чек-ин', deps.miniappUrl);
+        await ctx.reply('Открываю чек-ин', { reply_markup: keyboard });
+        return ctx.answerCallbackQuery();
+      }
+
+      return ctx.answerCallbackQuery();
     });
   }
 

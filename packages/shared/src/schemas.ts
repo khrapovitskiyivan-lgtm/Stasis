@@ -99,6 +99,43 @@ export const RenderedResultSchema = z.object({
 });
 export type RenderedResult = z.infer<typeof RenderedResultSchema>;
 
+// --- Return loop (check-in) contract ---
+
+export const CheckinSubmitSchema = z.object({
+  wheel: WheelScoresSchema,
+  energy: z.number().int().min(1).max(6),
+  stepRef: z.number().int().nullable(),
+  stepOutcome: z.enum(['done', 'partial', 'missed', 'changed']).nullable(),
+  note: z.string().max(500).nullable(),
+});
+export type CheckinSubmit = z.infer<typeof CheckinSubmitSchema>;
+
+// Mirrors apps/server/src/engine/digest.ts `Digest` — the digest is computed
+// server-side (deterministic selection engine) and shipped to the client as
+// plain JSON; this schema lets the client validate the response shape.
+export const ObservationSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('step'), outcome: z.enum(['done', 'partial', 'missed', 'changed']) }),
+  z.object({ kind: z.literal('sphere'), area: areaEnum, delta: z.number() }),
+  z.object({ kind: z.literal('pattern'), area: areaEnum }),
+  z.object({ kind: z.literal('energy'), delta: z.number() }),
+]);
+export type Observation = z.infer<typeof ObservationSchema>;
+
+export const DigestSchema = z.object({
+  observations: z.array(ObservationSchema),
+  nextStep: z.enum(['continue', 'shrink', 'new']),
+  safety: z.boolean(),
+});
+export type Digest = z.infer<typeof DigestSchema>;
+
+// GET /checkin: a memory anchor — the last assigned step (if any) and the
+// most recent wheel snapshot (from a check-in, else the onboarding test run).
+export const CheckinPromptSchema = z.object({
+  lastStep: z.object({ text: z.string(), cardRef: z.string() }).nullable(),
+  lastWheel: WheelScoresSchema.nullable(),
+});
+export type CheckinPrompt = z.infer<typeof CheckinPromptSchema>;
+
 // Public share payload: witness-copy only. Deliberately excludes scores,
 // spheres, answers, and belief/matrix text — this is the only shape that
 // ever reaches an unauthenticated /share/:slug response.

@@ -13,16 +13,30 @@ import { profilesRepo } from './db/profiles.repo.js';
 import { followUpsRepo } from './db/followups.repo.js';
 import { verifyInitData, InitDataError } from './auth/init-data.js';
 import { issueSession, verifySession, SessionError } from './auth/session.js';
-import { SubmitPayloadSchema, ConsentPayloadSchema, SharePublicPayloadSchema, AREAS } from '@stasis/shared';
+import { SubmitPayloadSchema, ConsentPayloadSchema, SharePublicPayloadSchema, CheckinSubmitSchema, AREAS } from '@stasis/shared';
+import type { WheelScores } from '@stasis/shared';
 import { computeProfile } from './engine/index.js';
 import { renderResult } from './engine/render.js';
+import { computeDigest, type DigestHistory } from './engine/digest.js';
 import { buildSharePayload } from './share/payload.js';
 import { renderOgSvg, svgToPng } from './share/og-image.js';
 import type { ContentBundle } from './content/loader.js';
 import { webhookHandler } from './bot/webhook.js';
+import { checkinsRepo } from './db/checkins.repo.js';
 
 const AUTH_MAX_AGE_SEC = 3 * 3600;
 const SESSION_TTL_SEC = 60 * 60;
+
+// GET /checkin's `lastWheel`: the most recent wheel snapshot across both the
+// onboarding/retake test_runs series and the checkins series, by timestamp.
+function latestWheelSnapshot(
+  wheelHistory: { createdAt: number; wheel: WheelScores }[],
+  checkinHistory: { createdAt: number; wheel: WheelScores }[]
+): WheelScores | null {
+  const all = [...wheelHistory, ...checkinHistory];
+  if (all.length === 0) return null;
+  return all.reduce((latest, c) => (c.createdAt > latest.createdAt ? c : latest)).wheel;
+}
 
 // Extracted so /me and /submit share identical bad-token handling.
 function readSession(req: FastifyRequest, secret: string): { userId: number } {
@@ -57,7 +71,9 @@ export function buildApp(deps: {
   const shares = sharesRepo(deps.db);
   const profiles = profilesRepo(deps.db);
   const followUps = followUpsRepo(deps.db, deps.encKey);
+  const checkins = checkinsRepo(deps.db, deps.encKey);
   const FOLLOWUP_DELAY_MS = 3 * 24 * 3600 * 1000;
+  const CHECKIN_DELAY_MS = 14 * 24 * 3600 * 1000;
   // Per-slug OG image cache: the share payload is immutable once created, so
   // a rendered PNG never goes stale. Lives for the process lifetime of this
   // app instance (MVP-scale; a later optimization could move this to disk/CDN).
@@ -239,6 +255,48 @@ export function buildApp(deps: {
     return { ok: true };
   });
 
+  // Memory anchor for the return-loop check-in screen: the last step assigned
+  // (if any) and the most recent wheel snapshot, so the client can show "last
+  // time you said you'd..." without the user having to recall it.
+  app.get('/checkin', async (req, reply) => {
+    let userId: number;
+    try {
+      userId = readSession(req, deps.jwtSecret).userId;
+    } catch (e) {
+      if (e instanceof SessionError) return reply.code(401).send({ error: 'invalid_session' });
+      throw e;
+    }
+    if (!users.getById(userId)) return reply.code(401).send({ error: 'invalid_session' });
+    const lastStep = followUps.latestStep(userId);
+    const lastWheel = latestWheelSnapshot(runs.wheelHistory(userId), checkins.history(userId));
+    return { lastStep, lastWheel };
+  });
+
+  app.post('/checkin', async (req, reply) => {
+    let userId: number;
+    try {
+      userId = readSession(req, deps.jwtSecret).userId;
+    } catch (e) {
+      if (e instanceof SessionError) return reply.code(401).send({ error: 'invalid_session' });
+      throw e;
+    }
+    if (!users.getById(userId)) return reply.code(401).send({ error: 'invalid_session' });
+    const parsed = CheckinSubmitSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'invalid_payload' });
+
+    const now = Date.now();
+    checkins.save(userId, parsed.data, now);
+
+    const history: DigestHistory = {
+      wheels: runs.wheelHistory(userId),
+      checkins: checkins.history(userId), // includes the row just saved above
+      resourceState: profiles.latestResourceState(userId) ?? 'ok',
+    };
+    const digest = computeDigest(history, now);
+    followUps.scheduleCheckin(userId, now + CHECKIN_DELAY_MS);
+    return { digest };
+  });
+
   // Serve the Mini App SPA from this same origin (single TLS cert, single
   // web_app URL for Telegram). Only wired up when a built dist is provided —
   // dev/tests without it keep `GET /` as a plain 404. `wildcard: false` means
@@ -253,7 +311,7 @@ export function buildApp(deps: {
     // (typo'd path, wrong method, etc.) the caller gets a JSON 404, never the
     // SPA's index.html. Everything else on GET is assumed to be a client-side
     // route the React Mini App router owns, so it gets index.html instead.
-    const API_PREFIXES = ['/auth', '/me', '/submit', '/assessment', '/signal', '/consent', '/share', '/followup', '/webhook', '/health'];
+    const API_PREFIXES = ['/auth', '/me', '/submit', '/assessment', '/signal', '/consent', '/share', '/followup', '/checkin', '/webhook', '/health'];
     app.setNotFoundHandler((req, reply) => {
       const path = req.url.split('?')[0];
       const isApiPath = API_PREFIXES.some((p) => req.url === p || req.url.startsWith(p + '/') || req.url.startsWith(p + '?'));
