@@ -9,11 +9,12 @@ export interface FollowUpRow {
   dueAt: number;
   sentAt: number | null;
   response: string | null;
+  kind: string;
 }
 
 export function followUpsRepo(db: Db, encKey: string) {
   const insert = db.prepare(
-    `INSERT INTO follow_ups (user_id, card_ref, step_text, due_at, unsubscribed, created_at) VALUES (?, ?, ?, ?, ?, ?)`
+    `INSERT INTO follow_ups (user_id, card_ref, step_text, due_at, unsubscribed, kind, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
   );
   // Only rows that are due, unsent, and not from an unsubscribed user.
   const selectDue = db.prepare(
@@ -37,13 +38,21 @@ export function followUpsRepo(db: Db, encKey: string) {
     dueAt: r.due_at,
     sentAt: r.sent_at,
     response: r.response,
+    kind: r.kind,
   });
 
   return {
     schedule(userId: number, cardRef: string, stepText: string, dueAt: number): { id: number } {
       // Respect a persisted opt-out: schedule the row already unsubscribed so due() never picks it.
       const optedOut = (optedOutStmt.get(userId) as { followups_opt_out?: number } | undefined)?.followups_opt_out === 1;
-      const res = insert.run(userId, cardRef, encryptField(stepText, encKey), dueAt, optedOut ? 1 : 0, Date.now());
+      const res = insert.run(userId, cardRef, encryptField(stepText, encKey), dueAt, optedOut ? 1 : 0, 'step', Date.now());
+      return { id: Number(res.lastInsertRowid) };
+    },
+    // Schedules a "how are you doing" check-in nudge (no step text attached).
+    // Same opt-out gating as schedule() so a silenced user stays silenced.
+    scheduleCheckin(userId: number, dueAt: number): { id: number } {
+      const optedOut = (optedOutStmt.get(userId) as { followups_opt_out?: number } | undefined)?.followups_opt_out === 1;
+      const res = insert.run(userId, 'checkin', encryptField('', encKey), dueAt, optedOut ? 1 : 0, 'checkin', Date.now());
       return { id: Number(res.lastInsertRowid) };
     },
     due(now: number): FollowUpRow[] {

@@ -86,7 +86,28 @@ describe('followUpsRepo', () => {
   });
 });
 
+describe('followUpsRepo — checkin nudges', () => {
+  it('scheduleCheckin creates a due checkin nudge that respects opt-out', () => {
+    const db = openDb(':memory:');
+    const { id: userId } = usersRepo(db).upsertByTgId(47, 'ivan6', 'ru');
+    const repo = followUpsRepo(db, ENC);
+    repo.scheduleCheckin(userId, 1000);
+    const due = repo.due(2000);
+    expect(due.some((r) => r.kind === 'checkin')).toBe(true);
+  });
+});
+
 describe('runDueFollowUps', () => {
+  it('a long/overlapping tick does not double-send (re-entrancy guard)', async () => {
+    const db = openDb(':memory:');
+    const { id: userId } = usersRepo(db).upsertByTgId(48, 'ivan7', 'ru');
+    followUpsRepo(db, ENC).schedule(userId, 'fire:career', 'шаг', 1000);
+    let sends = 0;
+    const bot = { api: { sendMessage: async () => { sends++; } } } as any;
+    await Promise.all([runDueFollowUps(db, ENC, bot, 2000), runDueFollowUps(db, ENC, bot, 2000)]);
+    expect(sends).toBe(1);
+  });
+
   it('sends the nudge once for a due row and is idempotent on a second run', async () => {
     const db = openDb(':memory:');
     const { id: userId } = usersRepo(db).upsertByTgId(44, 'ivan3', 'ru');
