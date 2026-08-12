@@ -10,6 +10,7 @@ export interface CheckinScreenProps {
   lastWheel: CheckinPrompt['lastWheel'];
   onSubmit: (payload: CheckinSubmit) => void;
   submitting?: boolean;
+  submitError?: string | null;
 }
 
 const OUTCOME_OPTIONS: { value: StepOutcome; label: string }[] = [
@@ -21,7 +22,7 @@ const OUTCOME_OPTIONS: { value: StepOutcome; label: string }[] = [
 
 const DEFAULT_WHEEL_VALUE = 5;
 
-export function CheckinScreen({ lastStep, lastWheel, onSubmit, submitting }: CheckinScreenProps) {
+export function CheckinScreen({ lastStep, lastWheel, onSubmit, submitting, submitError }: CheckinScreenProps) {
   const [wheel, setWheel] = useState<Partial<WheelScores>>(lastWheel ?? {});
   const [energy, setEnergy] = useState<LikertValue | undefined>(undefined);
   const [outcome, setOutcome] = useState<StepOutcome | null>(null);
@@ -102,6 +103,12 @@ export function CheckinScreen({ lastStep, lastWheel, onSubmit, submitting }: Che
           aria-label="Заметка"
         />
       </label>
+
+      {submitError ? (
+        <p className="screen-text checkin-submit-error" role="alert">
+          {submitError}
+        </p>
+      ) : null}
 
       <button
         type="button"

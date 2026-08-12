@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import type { RenderedResult } from '@stasis/shared';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import type { CheckinPrompt, Digest, RenderedResult } from '@stasis/shared';
 import { AREAS } from '@stasis/shared';
 import type { Assessment } from './api.js';
 import { App } from './App.js';
@@ -47,6 +47,9 @@ const fixtureResult: RenderedResult = {
   },
 };
 
+const fixtureCheckinPrompt: CheckinPrompt = { lastStep: null, lastWheel: null };
+const fixtureDigest: Digest = { observations: [], nextStep: 'continue', safety: false };
+
 const mockApi = {
   authed: vi.fn().mockResolvedValue(undefined),
   getAssessment: vi.fn().mockResolvedValue(fixtureAssessment),
@@ -55,6 +58,8 @@ const mockApi = {
   recordConsent: vi.fn().mockResolvedValue(undefined),
   createShare: vi.fn().mockResolvedValue({ slug: 'abc123', url: 'https://api.test?startapp=abc123' }),
   takeStep: vi.fn().mockResolvedValue(undefined),
+  getCheckin: vi.fn().mockResolvedValue(fixtureCheckinPrompt),
+  submitCheckin: vi.fn().mockResolvedValue({ digest: fixtureDigest }),
 };
 
 vi.mock('./api.js', () => ({
@@ -70,6 +75,8 @@ beforeEach(() => {
   mockApi.recordConsent.mockResolvedValue(undefined);
   mockApi.createShare.mockResolvedValue({ slug: 'abc123', url: 'https://api.test?startapp=abc123' });
   mockApi.takeStep.mockResolvedValue(undefined);
+  mockApi.getCheckin.mockResolvedValue(fixtureCheckinPrompt);
+  mockApi.submitCheckin.mockResolvedValue({ digest: fixtureDigest });
   delete (globalThis as any).Telegram;
 });
 
@@ -202,5 +209,55 @@ describe('App flow smoke test', () => {
     fireEvent.click(screen.getByRole('button', { name: /попробовать ещё раз/i }));
     expect(await screen.findByText(/твой результат/i)).toBeInTheDocument();
     expect(mockApi.submit).toHaveBeenCalledTimes(2);
+  });
+});
+
+// Enters the check-in step directly (bypassing onboarding), mirroring how a
+// returning user opens the Mini App from the check-in nudge deep-link:
+// getEntryMode() reads Telegram.WebApp.initDataUnsafe.start_param === 'checkin'.
+function renderAtCheckin() {
+  (globalThis as any).Telegram = {
+    WebApp: { initData: 'raw-init-data', initDataUnsafe: { start_param: 'checkin' } },
+  };
+  render(<App />);
+}
+
+describe('Check-in flow', () => {
+  it('surfaces the submit error inline and keeps the form on screen when POST /checkin fails', async () => {
+    mockApi.submitCheckin.mockRejectedValueOnce(new Error('network'));
+    renderAtCheckin();
+
+    const energyGroup = await screen.findByRole('radiogroup', { name: /энерги/i });
+    fireEvent.click(within(energyGroup).getAllByRole('radio')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /отправить/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/не удалось отправить чек-ин/i);
+    // the form is still there — the user can retry, not stuck on a blank screen
+    expect(screen.getByRole('button', { name: /отправить/i })).toBeInTheDocument();
+    expect(mockApi.submitCheckin).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not fire a second submitCheckin call when the submit button is hit again while the first request is in flight', async () => {
+    let resolveSubmit: (v: { digest: Digest }) => void = () => {};
+    mockApi.submitCheckin.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveSubmit = resolve;
+      })
+    );
+    renderAtCheckin();
+
+    const energyGroup = await screen.findByRole('radiogroup', { name: /энерги/i });
+    fireEvent.click(within(energyGroup).getAllByRole('radio')[0]);
+    const submitButton = screen.getByRole('button', { name: /отправить/i });
+
+    fireEvent.click(submitButton);
+    expect(mockApi.submitCheckin).toHaveBeenCalledTimes(1);
+    // in flight: the button disables, so a second tap must not fire another POST
+    expect(submitButton).toBeDisabled();
+    fireEvent.click(submitButton);
+    expect(mockApi.submitCheckin).toHaveBeenCalledTimes(1);
+
+    resolveSubmit({ digest: fixtureDigest });
+    await waitFor(() => expect(mockApi.submitCheckin).toHaveBeenCalledTimes(1));
   });
 });

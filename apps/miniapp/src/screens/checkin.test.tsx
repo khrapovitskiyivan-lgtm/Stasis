@@ -54,6 +54,27 @@ describe('CheckinScreen', () => {
       note: null,
     });
   });
+
+  it('renders the submit error inline near the submit button when submitError is set', () => {
+    render(
+      <CheckinScreen
+        lastStep={null}
+        lastWheel={null}
+        onSubmit={vi.fn()}
+        submitError="Не удалось отправить чек-ин. Попробуйте ещё раз."
+      />
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Не удалось отправить чек-ин. Попробуйте ещё раз.');
+  });
+
+  it('disables the submit button while submitting', () => {
+    render(
+      <CheckinScreen lastStep={null} lastWheel={null} onSubmit={vi.fn()} submitting />
+    );
+    const energyGroup = screen.getByRole('radiogroup', { name: /энерги/i });
+    fireEvent.click(within(energyGroup).getAllByRole('radio')[0]);
+    expect(screen.getByRole('button', { name: /отправить/i })).toBeDisabled();
+  });
 });
 
 function makeDigest(overrides: Partial<Digest> = {}): Digest {

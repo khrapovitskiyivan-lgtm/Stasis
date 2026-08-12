@@ -34,10 +34,19 @@ export function computeDigest(history: DigestHistory, _now: number): Digest {
 
   if (last?.stepOutcome) observations.push({ kind: 'step', outcome: last.stepOutcome });
 
-  // sphere drift: latest wheel vs the previous snapshot (checkin wheels + the onboarding wheel)
-  const wheelSeries = [...history.wheels.map((w) => w.wheel), ...history.checkins.map((c) => c.wheel)];
+  // sphere drift: latest wheel vs the previous snapshot (checkin wheels + the
+  // onboarding wheel), ordered by createdAt so an interleaved retake (a new
+  // onboarding wheel recorded between check-ins) still compares the two
+  // chronologically-latest wheels rather than assuming wheels precede checkins.
+  const wheelSeries = [
+    ...history.wheels.map((w) => ({ createdAt: w.createdAt, wheel: w.wheel })),
+    ...history.checkins.map((c) => ({ createdAt: c.createdAt, wheel: c.wheel })),
+  ].sort((a, b) => a.createdAt - b.createdAt);
   if (wheelSeries.length >= 2) {
-    const drop = biggestDrop(wheelSeries[wheelSeries.length - 2], wheelSeries[wheelSeries.length - 1]);
+    const drop = biggestDrop(
+      wheelSeries[wheelSeries.length - 2].wheel,
+      wheelSeries[wheelSeries.length - 1].wheel
+    );
     if (drop) observations.push({ kind: 'sphere', area: drop.area, delta: drop.delta });
   }
 

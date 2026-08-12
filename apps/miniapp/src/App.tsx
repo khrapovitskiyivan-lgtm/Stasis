@@ -46,7 +46,12 @@ export function App() {
   const [checkinPrompt, setCheckinPrompt] = useState<CheckinPrompt | null>(null);
   const [checkinDigest, setCheckinDigest] = useState<Digest | null>(null);
   const [checkinError, setCheckinError] = useState<string | null>(null);
+  const [checkinSubmitting, setCheckinSubmitting] = useState(false);
   const checkinLoadAttempted = useRef(false);
+  // Guards the check-in submit to exactly one in-flight attempt (mirrors
+  // submitAttempted above); a double-tap before the disabled button re-renders
+  // must not fire a second POST /checkin (duplicate rows, duplicate nudges).
+  const checkinSubmitInFlight = useRef(false);
 
   const loadAssessment = useCallback((client: Api) => {
     setLoadError(null);
@@ -144,12 +149,18 @@ export function App() {
 
   const handleCheckinSubmit = useCallback(
     (payload: CheckinSubmit) => {
-      if (!api) return;
+      if (!api || checkinSubmitInFlight.current) return;
+      checkinSubmitInFlight.current = true;
+      setCheckinSubmitting(true);
       setCheckinError(null);
       api
         .submitCheckin(payload)
         .then(({ digest }) => setCheckinDigest(digest))
-        .catch(() => setCheckinError('Не удалось отправить чек-ин. Попробуйте ещё раз.'));
+        .catch(() => setCheckinError('Не удалось отправить чек-ин. Попробуйте ещё раз.'))
+        .finally(() => {
+          checkinSubmitInFlight.current = false;
+          setCheckinSubmitting(false);
+        });
     },
     [api]
   );
@@ -258,7 +269,19 @@ export function App() {
       if (checkinDigest) {
         content = <DigestScreen digest={checkinDigest} onDone={handleCheckinDone} />;
       } else if (checkinPrompt) {
-        content = <CheckinScreen lastStep={checkinPrompt.lastStep} lastWheel={checkinPrompt.lastWheel} onSubmit={handleCheckinSubmit} />;
+        // Once the prompt has loaded, checkinError (if set) can only be a
+        // submit failure — the load path clears it before fetching and only
+        // ever populates checkinPrompt on success. Thread it into the screen
+        // as an inline submit error instead of the full-page error below.
+        content = (
+          <CheckinScreen
+            lastStep={checkinPrompt.lastStep}
+            lastWheel={checkinPrompt.lastWheel}
+            onSubmit={handleCheckinSubmit}
+            submitting={checkinSubmitting}
+            submitError={checkinError}
+          />
+        );
       } else if (checkinError) {
         content = (
           <div className="screen">
