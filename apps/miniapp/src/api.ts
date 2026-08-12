@@ -1,4 +1,15 @@
-import { RenderedResultSchema, type Area, type ConsentPayload, type RenderedResult, type SubmitPayload } from '@stasis/shared';
+import {
+  CheckinPromptSchema,
+  DigestSchema,
+  RenderedResultSchema,
+  type Area,
+  type CheckinPrompt,
+  type CheckinSubmit,
+  type ConsentPayload,
+  type Digest,
+  type RenderedResult,
+  type SubmitPayload,
+} from '@stasis/shared';
 
 export class ApiError extends Error {
   constructor(
@@ -24,6 +35,8 @@ export interface Api {
   recordConsent(payload: ConsentPayload): Promise<void>;
   createShare(profileId: number): Promise<{ slug: string; url: string }>;
   takeStep(cardRef: string, stepText: string): Promise<void>;
+  getCheckin(): Promise<CheckinPrompt>;
+  submitCheckin(payload: CheckinSubmit): Promise<{ digest: Digest }>;
 }
 
 export function createApi(baseUrl: string, initDataRaw: string): Api {
@@ -125,5 +138,47 @@ export function createApi(baseUrl: string, initDataRaw: string): Api {
     if (!res.ok) throw new ApiError(res.status, 'take-step failed');
   }
 
-  return { authed, getAssessment, submit, signal, recordConsent, createShare, takeStep };
+  // Not best-effort: the check-in memory anchor must surface a failure so the
+  // caller can show a retry rather than silently rendering an empty screen.
+  async function getCheckin(): Promise<CheckinPrompt> {
+    await authed();
+    const res = await fetch(`${baseUrl}/checkin`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new ApiError(res.status, 'checkin fetch failed');
+    const body = await res.json();
+    const parsed = CheckinPromptSchema.safeParse(body);
+    if (!parsed.success) throw new ApiError(500, 'invalid checkin payload');
+    return parsed.data;
+  }
+
+  // Not best-effort: the digest is the entire point of submitting a check-in.
+  async function submitCheckin(payload: CheckinSubmit): Promise<{ digest: Digest }> {
+    await authed();
+    const res = await fetch(`${baseUrl}/checkin`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${token}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new ApiError(res.status, 'checkin submit failed');
+    const body = (await res.json()) as { digest: unknown };
+    const parsed = DigestSchema.safeParse(body.digest);
+    if (!parsed.success) throw new ApiError(500, 'invalid digest payload');
+    return { digest: parsed.data };
+  }
+
+  return {
+    authed,
+    getAssessment,
+    submit,
+    signal,
+    recordConsent,
+    createShare,
+    takeStep,
+    getCheckin,
+    submitCheckin,
+  };
 }

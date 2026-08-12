@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
-import { AREAS, type BeliefCard as BeliefCardData, type RenderedResult, type SubmitPayload } from '@stasis/shared';
-import { initTelegram } from './telegram.js';
+import {
+  AREAS,
+  type BeliefCard as BeliefCardData,
+  type CheckinPrompt,
+  type CheckinSubmit,
+  type Digest,
+  type RenderedResult,
+  type SubmitPayload,
+} from '@stasis/shared';
+import { initTelegram, getEntryMode } from './telegram.js';
 import { createApi, type Api, type Assessment } from './api.js';
-import { flowReducer, initialFlow } from './flow.js';
+import { flowReducer, initialFlowForEntry } from './flow.js';
 import { Consent } from './screens/Consent.js';
 import { Intro } from './screens/Intro.js';
 import { WheelScreen } from './screens/WheelScreen.js';
@@ -10,6 +18,8 @@ import { ResourceScreen } from './screens/ResourceScreen.js';
 import { ElementsScreen } from './screens/ElementsScreen.js';
 import { StrategyScreen } from './screens/StrategyScreen.js';
 import { ResultScreen } from './screens/ResultScreen.js';
+import { CheckinScreen } from './screens/CheckinScreen.js';
+import { DigestScreen } from './screens/DigestScreen.js';
 
 const BASE_URL = ((import.meta as any).env?.VITE_API_BASE as string | undefined) ?? '';
 const CONSENT_DOC_VERSION = '2026-07-23';
@@ -30,7 +40,13 @@ export function App() {
   // Guards the consent recording call to fire at most once per session.
   const consentRecorded = useRef(false);
 
-  const [state, dispatch] = useReducer(flowReducer, initialFlow);
+  // Resolved once, synchronously, at mount — the check-in nudge deep-link
+  // determines the *initial* step only; nothing later re-derives it.
+  const [state, dispatch] = useReducer(flowReducer, null, () => initialFlowForEntry(getEntryMode()));
+  const [checkinPrompt, setCheckinPrompt] = useState<CheckinPrompt | null>(null);
+  const [checkinDigest, setCheckinDigest] = useState<Digest | null>(null);
+  const [checkinError, setCheckinError] = useState<string | null>(null);
+  const checkinLoadAttempted = useRef(false);
 
   const loadAssessment = useCallback((client: Api) => {
     setLoadError(null);
@@ -112,6 +128,35 @@ export function App() {
     submitAttempted.current = false;
     setSubmitError(null);
     setRetryNonce((n) => n + 1);
+  }, []);
+
+  // Check-in entry mode: fetch the memory anchor (last step + last wheel)
+  // once, mirroring the assessment-load pattern above.
+  useEffect(() => {
+    if (state.step !== 'checkin' || !api || checkinLoadAttempted.current) return;
+    checkinLoadAttempted.current = true;
+    setCheckinError(null);
+    api
+      .getCheckin()
+      .then(setCheckinPrompt)
+      .catch(() => setCheckinError('Не удалось загрузить чек-ин.'));
+  }, [state.step, api]);
+
+  const handleCheckinSubmit = useCallback(
+    (payload: CheckinSubmit) => {
+      if (!api) return;
+      setCheckinError(null);
+      api
+        .submitCheckin(payload)
+        .then(({ digest }) => setCheckinDigest(digest))
+        .catch(() => setCheckinError('Не удалось отправить чек-ин. Попробуйте ещё раз.'));
+    },
+    [api]
+  );
+
+  const handleCheckinDone = useCallback(() => {
+    const tg = (globalThis as any).Telegram?.WebApp;
+    tg?.close?.();
   }, []);
 
   const handleSignal = useCallback(
@@ -207,6 +252,21 @@ export function App() {
         );
       } else {
         content = <p className="screen-text">Считаем результат…</p>;
+      }
+      break;
+    case 'checkin':
+      if (checkinDigest) {
+        content = <DigestScreen digest={checkinDigest} onDone={handleCheckinDone} />;
+      } else if (checkinPrompt) {
+        content = <CheckinScreen lastStep={checkinPrompt.lastStep} lastWheel={checkinPrompt.lastWheel} onSubmit={handleCheckinSubmit} />;
+      } else if (checkinError) {
+        content = (
+          <div className="screen">
+            <p className="screen-text">{checkinError}</p>
+          </div>
+        );
+      } else {
+        content = <p className="screen-text">Загрузка…</p>;
       }
       break;
     default:

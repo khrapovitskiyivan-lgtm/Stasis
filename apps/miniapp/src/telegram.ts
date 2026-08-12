@@ -27,3 +27,25 @@ export function initTelegram(): TgContext {
   const dev = env.DEV ? ((globalThis as any).__VITE_DEV_INIT_DATA__ ?? env.VITE_DEV_INIT_DATA) : env.VITE_DEV_INIT_DATA;
   return { initDataRaw: dev ?? '', theme: 'light' };
 }
+
+/**
+ * Detects whether this session was opened from the check-in nudge deep-link
+ * rather than a fresh onboarding run. Bot API callback buttons can't launch
+ * a Mini App with an arbitrary URL, so the check-in nudge (apps/server/src/
+ * bot/bot.ts) opens a plain web_app button — there is currently no
+ * start_param carried through that path. This checks Telegram's
+ * `start_param` first (forward-compatible with a future `startapp=checkin`
+ * deep link) and falls back to a `?mode=checkin` URL query param, which the
+ * web_app button URL can already carry today without server changes.
+ */
+export function getEntryMode(): 'checkin' | null {
+  const wa = (globalThis as any).Telegram?.WebApp;
+  if (wa?.initDataUnsafe?.start_param === 'checkin') return 'checkin';
+  try {
+    const search = (globalThis as any).location?.search ?? '';
+    if (new URLSearchParams(search).get('mode') === 'checkin') return 'checkin';
+  } catch {
+    // no URL/location available (non-browser test env) — no entry mode
+  }
+  return null;
+}

@@ -8,8 +8,14 @@ export type Step =
   | 'miniInsight'
   | 'elements'
   | 'strategy'
-  | 'result';
+  | 'result'
+  | 'checkin';
 
+// The onboarding sequence next/back step through. 'checkin' is deliberately
+// excluded: it's a separate entry mode (opened straight from the check-in
+// nudge deep-link, see initialFlowForEntry below), not a step in this
+// linear assessment — it doesn't use next/back, it swaps its own digest
+// view in locally after submit.
 export const STEPS: readonly Step[] = [
   'consent',
   'intro',
@@ -48,6 +54,17 @@ export const initialFlow: FlowState = {
   strategyAnswers: [],
   resourceAnswers: [],
 };
+
+/**
+ * Entry point for a session opened from the check-in nudge (bot deep-link):
+ * lands the reducer straight on the 'checkin' step instead of 'consent',
+ * skipping the onboarding sequence entirely. Consent for a returning user
+ * was already recorded during onboarding; check-in auth is independent of
+ * the client-side consent gate (same as submit()).
+ */
+export function initialFlowForEntry(mode: 'checkin' | null): FlowState {
+  return mode === 'checkin' ? { ...initialFlow, step: 'checkin' } : initialFlow;
+}
 
 const AXIS_KEY: Record<FlowAxis, 'elementAnswers' | 'strategyAnswers' | 'resourceAnswers'> = {
   element: 'elementAnswers',
